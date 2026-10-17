@@ -1,0 +1,9 @@
+app_name = "rrs_reports"
+app_title = "RRS Reports"
+app_publisher = "RRS Surgica"
+app_description = "Custom Distribution & Management Reports for RRS Surgica"
+app_email = "info@rrsurgica.com"
+app_license = "mit"
+
+# Includes in <head>
+# ------------------
