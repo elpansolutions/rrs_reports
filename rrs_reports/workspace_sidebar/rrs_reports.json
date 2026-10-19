@@ -48,6 +48,29 @@
    "icon": "sheet",
    "indent": 1,
    "keep_closed": 0,
+   "label": "Purchases & Procurement",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Invoice-Wise Purchase Abstract",
+   "link_to": "Invoice-Wise Purchase Abstract",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "sheet",
+   "indent": 1,
+   "keep_closed": 0,
    "label": "Collections & Outstanding",
    "link_type": "DocType",
    "show_arrow": 0,
@@ -61,6 +84,18 @@
    "keep_closed": 0,
    "label": "Market Outstanding Bills",
    "link_to": "Market Outstanding Bills",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Supplier Outstanding Bills",
+   "link_to": "Supplier Outstanding Bills",
    "link_type": "Report",
    "show_arrow": 0,
    "type": "Link"
@@ -101,7 +136,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-19 10:00:00.000000",
+ "modified": "2026-10-19 12:30:00.000000",
  "modified_by": "Administrator",
  "module": "RRS Reports",
  "name": "RRS Reports",

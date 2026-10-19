@@ -35,6 +35,12 @@ frappe.query_reports["Market Outstanding Bills"] = {
 			label: __("Days >="),
 			fieldtype: "Int",
 			default: 0
+		},
+		{
+			fieldname: "include_advances",
+			label: __("Include Advances"),
+			fieldtype: "Check",
+			default: 1
 		}
 	],
 	formatter: function (value, row, column, data, default_formatter) {
@@ -42,7 +48,10 @@ frappe.query_reports["Market Outstanding Bills"] = {
 		if (data && data.is_customer_header) {
 			value = `<span style="font-weight: bold; color: #1e3a8a; font-size: 13px;">${value}</span>`;
 		} else if (data && data.is_subtotal) {
-			value = `<span style="font-weight: bold; color: #111827;">${value}</span>`;
+			let color = (data.outstanding_amount < 0) ? "#059669" : "#111827";
+			value = `<span style="font-weight: bold; color: ${color};">${value}</span>`;
+		} else if (data && data.is_advance) {
+			value = `<span style="color: #059669; font-weight: 500;">${value}</span>`;
 		}
 		return value;
 	}

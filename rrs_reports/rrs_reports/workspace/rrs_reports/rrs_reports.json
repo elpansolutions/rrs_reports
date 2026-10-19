@@ -1,7 +1,7 @@
 {
  "app": "rrs_reports",
  "charts": [],
- "content": "[{\"id\":\"hdr_reports\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>RRS Custom Reports & Statements</b></span>\",\"col\":12}},{\"id\":\"card_sales\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales & Tax Reports\",\"col\":6}},{\"id\":\"card_outstanding\",\"type\":\"card\",\"data\":{\"card_name\":\"Collections & Outstanding\",\"col\":6}},{\"id\":\"card_stock\",\"type\":\"card\",\"data\":{\"card_name\":\"Inventory & Physical Audit\",\"col\":6}},{\"id\":\"card_pharma\",\"type\":\"card\",\"data\":{\"card_name\":\"Distribution & Secondary Sales\",\"col\":6}}]",
+ "content": "[{\"id\":\"hdr_reports\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>RRS Custom Reports & Statements</b></span>\",\"col\":12}},{\"id\":\"card_sales\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales & Tax Reports\",\"col\":6}},{\"id\":\"card_purchase\",\"type\":\"card\",\"data\":{\"card_name\":\"Purchase & Payables\",\"col\":6}},{\"id\":\"card_outstanding\",\"type\":\"card\",\"data\":{\"card_name\":\"Collections & Receivables\",\"col\":6}},{\"id\":\"card_stock\",\"type\":\"card\",\"data\":{\"card_name\":\"Inventory & Physical Audit\",\"col\":6}},{\"id\":\"card_pharma\",\"type\":\"card\",\"data\":{\"card_name\":\"Distribution & Secondary Sales\",\"col\":6}}]",
  "creation": "2026-10-17 16:45:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -36,7 +36,36 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Collections & Outstanding",
+   "label": "Purchase & Payables",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Invoice-Wise Purchase Abstract",
+   "link_count": 0,
+   "link_to": "Invoice-Wise Purchase Abstract",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Supplier Outstanding Bills",
+   "link_count": 0,
+   "link_to": "Supplier Outstanding Bills",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Collections & Receivables",
    "link_count": 1,
    "link_type": "DocType",
    "onboard": 0,
@@ -91,7 +120,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-17 16:45:00.000000",
+ "modified": "2026-10-19 12:30:00.000000",
  "modified_by": "Administrator",
  "module": "RRS Reports",
  "name": "RRS Reports",
@@ -117,9 +146,27 @@
    "color": "Grey",
    "doc_view": "",
    "format": "",
+   "icon": "table",
+   "label": "Purchase Abstract",
+   "link_to": "Invoice-Wise Purchase Abstract",
+   "type": "Report"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "",
+   "format": "",
    "icon": "money",
-   "label": "Market Outstanding",
+   "label": "Customer Outstanding",
    "link_to": "Market Outstanding Bills",
+   "type": "Report"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "",
+   "format": "",
+   "icon": "money",
+   "label": "Supplier Outstanding",
+   "link_to": "Supplier Outstanding Bills",
    "type": "Report"
   },
   {
