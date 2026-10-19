@@ -1,0 +1,21 @@
+{
+ "app": "rrs_reports",
+ "creation": "2026-10-19 10:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "table",
+ "icon_type": "Link",
+ "idx": 15,
+ "label": "RRS Reports",
+ "link_to": "RRS Reports",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-10-19 10:00:00.000000",
+ "modified_by": "Administrator",
+ "name": "RRS Reports",
+ "owner": "Administrator",
+ "parent_icon": "ERPNext",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}
