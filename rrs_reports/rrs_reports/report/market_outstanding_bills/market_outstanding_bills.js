@@ -53,8 +53,10 @@ frappe.query_reports["Market Outstanding Bills"] = {
 		{
 			fieldname: "customer",
 			label: __("Customer"),
-			fieldtype: "Link",
-			options: "Customer"
+			fieldtype: "MultiSelectList",
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Customer", txt);
+			}
 		},
 		{
 			fieldname: "supplier_group",
@@ -66,9 +68,11 @@ frappe.query_reports["Market Outstanding Bills"] = {
 		{
 			fieldname: "supplier",
 			label: __("Supplier"),
-			fieldtype: "Link",
-			options: "Supplier",
-			hidden: 1
+			fieldtype: "MultiSelectList",
+			hidden: 1,
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Supplier", txt);
+			}
 		},
 		{
 			fieldname: "min_days",

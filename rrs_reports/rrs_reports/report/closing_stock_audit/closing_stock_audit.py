@@ -59,6 +59,26 @@ def get_columns():
 	]
 
 
+def get_filter_list(val):
+	if not val:
+		return []
+	if isinstance(val, (list, tuple, set)):
+		return [str(x).strip() for x in val if str(x).strip()]
+	if isinstance(val, str):
+		val = val.strip()
+		if val.startswith("[") and val.endswith("]"):
+			import json
+
+			try:
+				parsed = json.loads(val)
+				if isinstance(parsed, list):
+					return [str(x).strip() for x in parsed if str(x).strip()]
+			except Exception:
+				pass
+		return [x.strip() for x in val.split(",") if x.strip()]
+	return [str(val).strip()]
+
+
 def get_data(filters):
 	as_on_date = getdate(filters.get("as_on_date") or nowdate())
 	show_zero_stock = int(filters.get("show_zero_stock") or 0)
@@ -66,9 +86,10 @@ def get_data(filters):
 	conditions = ["it.is_stock_item = 1", "it.disabled = 0"]
 	values = {"as_on_date": as_on_date}
 
-	if filters.get("brand"):
-		conditions.append("it.brand = %(brand)s")
-		values["brand"] = filters.get("brand")
+	brand_list = get_filter_list(filters.get("brand"))
+	if brand_list:
+		conditions.append("it.brand IN %(brand)s")
+		values["brand"] = tuple(brand_list)
 
 	if filters.get("item_group"):
 		conditions.append("it.item_group = %(item_group)s")

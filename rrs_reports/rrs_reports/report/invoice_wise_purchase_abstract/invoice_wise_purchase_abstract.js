@@ -28,8 +28,10 @@ frappe.query_reports["Invoice-Wise Purchase Abstract"] = {
 		{
 			fieldname: "supplier",
 			label: __("Supplier"),
-			fieldtype: "Link",
-			options: "Supplier"
+			fieldtype: "MultiSelectList",
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Supplier", txt);
+			}
 		},
 		{
 			fieldname: "supplier_group",

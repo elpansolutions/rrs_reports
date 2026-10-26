@@ -21,6 +21,26 @@ def execute(filters=None):
 	return columns, data
 
 
+def get_filter_list(val):
+	if not val:
+		return []
+	if isinstance(val, (list, tuple, set)):
+		return [str(x).strip() for x in val if str(x).strip()]
+	if isinstance(val, str):
+		val = val.strip()
+		if val.startswith("[") and val.endswith("]"):
+			import json
+
+			try:
+				parsed = json.loads(val)
+				if isinstance(parsed, list):
+					return [str(x).strip() for x in parsed if str(x).strip()]
+			except Exception:
+				pass
+		return [x.strip() for x in val.split(",") if x.strip()]
+	return [str(val).strip()]
+
+
 def get_columns(party_type="Customer"):
 	if party_type == "Supplier":
 		return [
@@ -153,9 +173,10 @@ def get_customer_data(filters):
 		inv_conditions.append("si.company = %(company)s")
 		values["company"] = filters.get("company")
 
-	if filters.get("customer"):
-		inv_conditions.append("si.customer = %(customer)s")
-		values["customer"] = filters.get("customer")
+	customer_list = get_filter_list(filters.get("customer"))
+	if customer_list:
+		inv_conditions.append("si.customer IN %(customer)s")
+		values["customer"] = tuple(customer_list)
 
 	if filters.get("territory"):
 		inv_conditions.append("(si.territory = %(territory)s OR c.territory = %(territory)s)")
@@ -199,8 +220,8 @@ def get_customer_data(filters):
 		]
 		if filters.get("company"):
 			adv_conditions.append("pe.company = %(company)s")
-		if filters.get("customer"):
-			adv_conditions.append("pe.party = %(customer)s")
+		if customer_list:
+			adv_conditions.append("pe.party IN %(customer)s")
 
 		adv_where = " AND ".join(adv_conditions)
 		advances = frappe.db.sql(
@@ -382,9 +403,10 @@ def get_supplier_data(filters):
 		pi_conditions.append("pi.company = %(company)s")
 		values["company"] = filters.get("company")
 
-	if filters.get("supplier"):
-		pi_conditions.append("pi.supplier = %(supplier)s")
-		values["supplier"] = filters.get("supplier")
+	supplier_list = get_filter_list(filters.get("supplier"))
+	if supplier_list:
+		pi_conditions.append("pi.supplier IN %(supplier)s")
+		values["supplier"] = tuple(supplier_list)
 
 	if filters.get("supplier_group"):
 		pi_conditions.append("(pi.supplier_group = %(supplier_group)s OR s.supplier_group = %(supplier_group)s)")
@@ -429,8 +451,8 @@ def get_supplier_data(filters):
 		]
 		if filters.get("company"):
 			adv_conditions.append("pe.company = %(company)s")
-		if filters.get("supplier"):
-			adv_conditions.append("pe.party = %(supplier)s")
+		if supplier_list:
+			adv_conditions.append("pe.party IN %(supplier)s")
 
 		adv_where = " AND ".join(adv_conditions)
 		advances = frappe.db.sql(

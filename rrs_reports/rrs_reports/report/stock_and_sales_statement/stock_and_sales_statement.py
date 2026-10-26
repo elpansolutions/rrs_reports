@@ -122,6 +122,26 @@ def get_columns():
 	]
 
 
+def get_filter_list(val):
+	if not val:
+		return []
+	if isinstance(val, (list, tuple, set)):
+		return [str(x).strip() for x in val if str(x).strip()]
+	if isinstance(val, str):
+		val = val.strip()
+		if val.startswith("[") and val.endswith("]"):
+			import json
+
+			try:
+				parsed = json.loads(val)
+				if isinstance(parsed, list):
+					return [str(x).strip() for x in parsed if str(x).strip()]
+			except Exception:
+				pass
+		return [x.strip() for x in val.split(",") if x.strip()]
+	return [str(val).strip()]
+
+
 def get_data(filters):
 	from_date = getdate(filters.get("from_date") or frappe.utils.get_first_day(nowdate()))
 	to_date = getdate(filters.get("to_date") or nowdate())
@@ -131,9 +151,10 @@ def get_data(filters):
 	conditions = ["it.is_stock_item = 1", "it.disabled = 0"]
 	values = {"from_date": from_date, "to_date": to_date}
 
-	if filters.get("brand"):
-		conditions.append("it.brand = %(brand)s")
-		values["brand"] = filters.get("brand")
+	brand_list = get_filter_list(filters.get("brand"))
+	if brand_list:
+		conditions.append("it.brand IN %(brand)s")
+		values["brand"] = tuple(brand_list)
 
 	where_clause = " AND ".join(conditions)
 

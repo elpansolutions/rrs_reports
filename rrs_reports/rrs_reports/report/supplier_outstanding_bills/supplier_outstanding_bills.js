@@ -27,8 +27,10 @@ frappe.query_reports["Supplier Outstanding Bills"] = {
 		{
 			fieldname: "supplier",
 			label: __("Supplier"),
-			fieldtype: "Link",
-			options: "Supplier"
+			fieldtype: "MultiSelectList",
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Supplier", txt);
+			}
 		},
 		{
 			fieldname: "min_days",

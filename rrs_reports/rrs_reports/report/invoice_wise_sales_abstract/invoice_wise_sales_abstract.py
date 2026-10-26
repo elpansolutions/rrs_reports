@@ -119,6 +119,26 @@ def get_columns():
 	]
 
 
+def get_filter_list(val):
+	if not val:
+		return []
+	if isinstance(val, (list, tuple, set)):
+		return [str(x).strip() for x in val if str(x).strip()]
+	if isinstance(val, str):
+		val = val.strip()
+		if val.startswith("[") and val.endswith("]"):
+			import json
+
+			try:
+				parsed = json.loads(val)
+				if isinstance(parsed, list):
+					return [str(x).strip() for x in parsed if str(x).strip()]
+			except Exception:
+				pass
+		return [x.strip() for x in val.split(",") if x.strip()]
+	return [str(val).strip()]
+
+
 def get_data(filters):
 	conditions = ["si.docstatus = 1"]
 	values = {}
@@ -135,9 +155,10 @@ def get_data(filters):
 		conditions.append("si.posting_date <= %(to_date)s")
 		values["to_date"] = filters.get("to_date")
 
-	if filters.get("customer"):
-		conditions.append("si.customer = %(customer)s")
-		values["customer"] = filters.get("customer")
+	customer_list = get_filter_list(filters.get("customer"))
+	if customer_list:
+		conditions.append("si.customer IN %(customer)s")
+		values["customer"] = tuple(customer_list)
 
 	if filters.get("territory"):
 		conditions.append("si.territory = %(territory)s")

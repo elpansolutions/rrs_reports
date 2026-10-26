@@ -28,8 +28,10 @@ frappe.query_reports["Stock and Sales Statement"] = {
 		{
 			fieldname: "brand",
 			label: __("Principal / Company"),
-			fieldtype: "Link",
-			options: "Brand"
+			fieldtype: "MultiSelectList",
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Brand", txt);
+			}
 		},
 		{
 			fieldname: "warehouse",
