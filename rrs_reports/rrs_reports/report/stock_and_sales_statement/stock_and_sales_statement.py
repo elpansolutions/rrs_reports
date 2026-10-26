@@ -368,4 +368,29 @@ def get_data(filters):
 		{"label": _("Last Month Sales"), "value": flt(tot_last_month_sales, 2), "datatype": "Currency"},
 	]
 
+	if data:
+		data.append({
+			"item_code": "",
+			"item_name": "",
+			"is_summary_row": 1,
+		})
+
+		summary_items = [
+			(_("Opening Value"), tot_opening_val),
+			(_("Purchase Value"), tot_purchase_val),
+			(_("Sales Value"), tot_sales_val),
+			(_("Closing Value"), tot_closing_val),
+			(_("Last Month Sales"), tot_last_month_sales),
+		]
+
+		for label, val in summary_items:
+			data.append({
+				"item_code": "",
+				"item_name": label,
+				"stock_uom": "",
+				"closing_value": flt(val, 2),
+				"is_summary_row": 1,
+				"bold": 1,
+			})
+
 	return data, report_summary

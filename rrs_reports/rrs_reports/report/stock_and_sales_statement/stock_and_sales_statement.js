@@ -41,6 +41,15 @@ frappe.query_reports["Stock and Sales Statement"] = {
 		}
 	],
 	formatter: function (value, row, column, data, default_formatter) {
+		if (data && data.is_summary_row) {
+			if (column.fieldname === "item_name") {
+				return `<span style="font-weight: bold; color: #0f172a; font-size: 11px;">${value || ""}</span>`;
+			}
+			if (column.fieldname === "closing_value" && value != null && value !== "") {
+				return `<span style="font-weight: bold; color: #047857; font-size: 11px;">${default_formatter(value, row, column, data)}</span>`;
+			}
+			return "";
+		}
 		if (column.fieldname === "item_code" && value) {
 			let link = `<a class="grey" href="/app/item/${encodeURIComponent(value)}" data-doctype="Item">${frappe.utils.escape_html(value)}</a>`;
 			if (data && data.is_non_moving) {

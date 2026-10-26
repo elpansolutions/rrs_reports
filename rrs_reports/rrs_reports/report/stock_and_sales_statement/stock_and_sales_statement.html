@@ -1,0 +1,246 @@
+<style type="text/css">
+    @media print {
+        @page {
+            size: A4 landscape;
+            margin: 6mm 8mm;
+        }
+        thead {
+            display: table-header-group;
+        }
+        tr {
+            page-break-inside: avoid;
+        }
+    }
+
+    .report-wrapper {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 8.5px;
+        color: #000;
+        width: 100%;
+        margin: 0 auto;
+        line-height: 1.2;
+    }
+
+    .header-section {
+        text-align: center;
+        margin-bottom: 8px;
+        border-bottom: 1.5px solid #000;
+        padding-bottom: 5px;
+    }
+
+    .company-title {
+        font-size: 14px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .report-title {
+        font-size: 11px;
+        font-weight: bold;
+        margin-top: 2px;
+    }
+
+    .report-meta-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 8.5px;
+        margin-top: 3px;
+        color: #333;
+    }
+
+    table.data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 8px;
+        table-layout: fixed;
+    }
+
+    table.data-table th {
+        background: #f8fafc;
+        border: 1px solid #000;
+        padding: 3px 2px;
+        font-weight: bold;
+        text-align: center;
+        vertical-align: middle;
+        font-size: 8px;
+    }
+
+    table.data-table td {
+        border: 1px solid #cbd5e1;
+        padding: 2.5px 3px;
+        vertical-align: middle;
+    }
+
+    .text-center { text-align: center; }
+    .text-left { text-align: left; }
+    .text-right { text-align: right; font-variant-numeric: tabular-nums; }
+    .bold { font-weight: bold; }
+    .non-moving { color: #b91c1c; font-weight: 600; }
+
+    /* SUMMARY VALUE BOX AT BOTTOM */
+    .summary-card {
+        margin-top: 10px;
+        page-break-inside: avoid;
+        border: 1.5px solid #000;
+        background: #fff;
+    }
+
+    .summary-header {
+        background: #f1f5f9;
+        font-weight: bold;
+        padding: 4px 8px;
+        border-bottom: 1px solid #000;
+        font-size: 9px;
+        letter-spacing: 0.3px;
+    }
+
+    .summary-grid {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 9px;
+    }
+
+    .summary-grid td {
+        padding: 4px 10px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .summary-label {
+        font-weight: bold;
+        color: #334155;
+    }
+
+    .summary-val {
+        text-align: right;
+        font-weight: bold;
+        font-size: 9.5px;
+    }
+</style>
+
+<div class="report-wrapper">
+    <!-- HEADER -->
+    <div class="header-section">
+        <div class="company-title">{%= filters.company || frappe.defaults.get_default("Company") || "R.R. SURGICA" %}</div>
+        <div class="report-title">{%= __("STOCK & SALES STATEMENT") %}</div>
+        <div class="report-meta-row">
+            <div>
+                <strong>{%= __("Period") %}:</strong> 
+                {%= frappe.datetime.str_to_user(filters.from_date) %} 
+                {%= __("to") %} 
+                {%= frappe.datetime.str_to_user(filters.to_date) %}
+            </div>
+            {% if (filters.brand) { %}
+            <div>
+                <strong>{%= __("Brand / Principal") %}:</strong> 
+                {%= Array.isArray(filters.brand) ? filters.brand.join(", ") : filters.brand %}
+            </div>
+            {% } %}
+            {% if (filters.warehouse) { %}
+            <div>
+                <strong>{%= __("Warehouse") %}:</strong> {%= filters.warehouse %}
+            </div>
+            {% } %}
+            <div>
+                <strong>{%= __("Printed") %}:</strong> {%= frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string()) %}
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN TABLE -->
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 25px;">#</th>
+                <th style="width: 80px;">{%= __("Item Code") %}</th>
+                <th style="width: 160px; text-align: left; padding-left: 4px;">{%= __("Product Name") %}</th>
+                <th style="width: 40px;">{%= __("Packg") %}</th>
+                <th style="width: 50px;">{%= __("Open Qty") %}</th>
+                <th style="width: 45px;">{%= __("Open Free") %}</th>
+                <th style="width: 50px;">{%= __("Rec Qty") %}</th>
+                <th style="width: 45px;">{%= __("Rec Free") %}</th>
+                <th style="width: 55px;">{%= __("Last Mo") %}</th>
+                <th style="width: 50px;">{%= __("Sales Qty") %}</th>
+                <th style="width: 45px;">{%= __("Sales Free") %}</th>
+                <th style="width: 40px;">{%= __("Adjmt") %}</th>
+                <th style="width: 55px;">{%= __("Closing Qty") %}</th>
+                <th style="width: 45px;">{%= __("Close Free") %}</th>
+                <th style="width: 70px;">{%= __("Closing Value") %}</th>
+                <th style="width: 45px;">{%= __("Age Days") %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% 
+                var item_index = 0;
+                var tot_opening_val = 0.0;
+                var tot_purchase_val = 0.0;
+                var tot_sales_val = 0.0;
+                var tot_closing_val = 0.0;
+                var tot_last_month_sales = 0.0;
+
+                for (var i = 0; i < data.length; i++) {
+                    var row = data[i];
+                    if (row.is_summary_row) {
+                        // Extract summary values if calculated
+                        if (row.item_name && row.item_name.indexOf("Opening Value") !== -1) tot_opening_val = row.closing_value || 0.0;
+                        if (row.item_name && row.item_name.indexOf("Purchase Value") !== -1) tot_purchase_val = row.closing_value || 0.0;
+                        if (row.item_name && row.item_name.indexOf("Sales Value") !== -1) tot_sales_val = row.closing_value || 0.0;
+                        if (row.item_name && row.item_name.indexOf("Closing Value") !== -1) tot_closing_val = row.closing_value || 0.0;
+                        if (row.item_name && row.item_name.indexOf("Last Month Sales") !== -1) tot_last_month_sales = row.closing_value || 0.0;
+                        continue;
+                    }
+                    item_index++;
+            %}
+            <tr class="{%= row.is_non_moving ? 'non-moving' : '' %}">
+                <td class="text-center">{%= item_index %}</td>
+                <td class="text-center bold">{%= row.item_code || "" %}</td>
+                <td class="text-left">{%= row.item_name || "" %}</td>
+                <td class="text-center">{%= row.stock_uom || "" %}</td>
+                <td class="text-right">{%= row.opening_qty ? format_number(row.opening_qty, null, 2) : "-" %}</td>
+                <td class="text-right">{%= row.opening_free ? format_number(row.opening_free, null, 2) : "-" %}</td>
+                <td class="text-right">{%= row.receipt_qty ? format_number(row.receipt_qty, null, 2) : "-" %}</td>
+                <td class="text-right">{%= row.receipt_free ? format_number(row.receipt_free, null, 2) : "-" %}</td>
+                <td class="text-right">{%= row.sales_last ? format_number(row.sales_last, null, 2) : "-" %}</td>
+                <td class="text-right">{%= row.sales_qty ? format_number(row.sales_qty, null, 2) : "-" %}</td>
+                <td class="text-right">{%= row.sales_free ? format_number(row.sales_free, null, 2) : "-" %}</td>
+                <td class="text-right">{%= row.adjmt ? format_number(row.adjmt, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= row.closing_qty ? format_number(row.closing_qty, null, 2) : "-" %}</td>
+                <td class="text-right">{%= row.closing_free ? format_number(row.closing_free, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= row.closing_value != null ? format_currency(row.closing_value, currency) : "-" %}</td>
+                <td class="text-center {%= row.is_non_moving ? 'bold' : '' %}">{%= row.age_days || "-" %}</td>
+            </tr>
+            {% } %}
+        </tbody>
+    </table>
+
+    <!-- SUMMARY SECTION -->
+    <div class="summary-card">
+        <div class="summary-header">
+            {%= __("STATEMENT VALUE SUMMARY") %}
+        </div>
+        <table class="summary-grid">
+            <tr>
+                <td class="summary-label" style="width: 20%;">{%= __("Opening Value") %}</td>
+                <td class="summary-val" style="width: 30%; color: #0284c7;">{%= format_currency(tot_opening_val, currency) %}</td>
+                <td class="summary-label" style="width: 20%;">{%= __("Purchase Value") %}</td>
+                <td class="summary-val" style="width: 30%; color: #7c3aed;">{%= format_currency(tot_purchase_val, currency) %}</td>
+            </tr>
+            <tr>
+                <td class="summary-label">{%= __("Sales Value") %}</td>
+                <td class="summary-val" style="color: #ea580c;">{%= format_currency(tot_sales_val, currency) %}</td>
+                <td class="summary-label">{%= __("Closing Value") %}</td>
+                <td class="summary-val" style="color: #047857; font-size: 10px;">{%= format_currency(tot_closing_val, currency) %}</td>
+            </tr>
+            <tr>
+                <td class="summary-label">{%= __("Last Month Sales") %}</td>
+                <td class="summary-val" style="color: #475569;">{%= format_currency(tot_last_month_sales, currency) %}</td>
+                <td style="border: none;"></td>
+                <td style="border: none;"></td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="font-size: 7.5px; color: #64748b; margin-top: 6px; text-align: right;">
+        * {%= __("Items marked with asterisk (*) indicate non-moving products above 30 days") %}
+    </div>
+</div>
