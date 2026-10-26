@@ -41,6 +41,13 @@ frappe.query_reports["Stock and Sales Statement"] = {
 		}
 	],
 	formatter: function (value, row, column, data, default_formatter) {
+		if (column.fieldname === "item_code" && value) {
+			let link = `<a class="grey" href="/app/item/${encodeURIComponent(value)}" data-doctype="Item">${frappe.utils.escape_html(value)}</a>`;
+			if (data && data.is_non_moving) {
+				return `<span style="color: #b91c1c;">${link}</span>`;
+			}
+			return link;
+		}
 		value = default_formatter(value, row, column, data);
 		if (data && data.is_non_moving) {
 			value = `<span style="color: #b91c1c;">${value}</span>`;
