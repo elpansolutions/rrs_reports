@@ -100,10 +100,13 @@ frappe.query_reports["Market Outstanding Bills"] = {
 		if (data && (data.is_customer_header || data.is_party_header || data.is_supplier_header)) {
 			let header_color = (frappe.query_report.get_filter_value("party_type") === "Supplier") ? "#7c2d12" : "#1e3a8a";
 			value = `<span style="font-weight: bold; color: ${header_color}; font-size: 13px;">${value}</span>`;
+		} else if (data && data.is_grand_total) {
+			let color = (data.outstanding_amount < 0) ? "#059669" : "#111827";
+			value = `<span style="font-weight: 800; color: ${color}; font-size: 13px; text-transform: uppercase;">${value}</span>`;
 		} else if (data && data.is_subtotal) {
 			let color = (data.outstanding_amount < 0) ? "#059669" : "#111827";
 			value = `<span style="font-weight: bold; color: ${color};">${value}</span>`;
-		} else if (data && data.is_advance) {
+		} else if (data && (data.is_advance || data.is_return)) {
 			value = `<span style="color: #059669; font-weight: 500;">${value}</span>`;
 		}
 		return value;

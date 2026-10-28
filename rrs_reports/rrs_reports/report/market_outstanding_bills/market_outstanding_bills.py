@@ -3,12 +3,19 @@
 
 import frappe
 from frappe import _
-from frappe.utils import date_diff, flt, getdate, nowdate
+from frappe.utils import cint, date_diff, flt, getdate, nowdate
 
 
 def execute(filters=None):
 	if not filters:
 		filters = {}
+	elif isinstance(filters, str):
+		import json
+
+		try:
+			filters = json.loads(filters)
+		except Exception:
+			filters = {}
 
 	party_type = filters.get("party_type") or "Customer"
 	columns = get_columns(party_type)
@@ -18,7 +25,7 @@ def execute(filters=None):
 	else:
 		data = get_customer_data(filters)
 
-	return columns, data
+	return columns, data, None, None, None, 1
 
 
 def get_filter_list(val):
@@ -165,8 +172,8 @@ def get_customer_data(filters):
 	min_days = int(filters.get("min_days") or 0)
 	include_advances = filters.get("include_advances", 1)
 
-	# 1. Fetch Unpaid Invoices
-	inv_conditions = ["si.docstatus = 1", "si.outstanding_amount > 0"]
+	# 1. Fetch Unpaid Invoices and Sales Returns / Credit Notes
+	inv_conditions = ["si.docstatus = 1", "si.outstanding_amount != 0"]
 	values = {"as_on_date": as_on_date}
 
 	if filters.get("company"):
@@ -198,6 +205,8 @@ def get_customer_data(filters):
 			COALESCE(NULLIF(si.territory, ''), c.territory) as territory,
 			si.grand_total as invoiced_amount,
 			si.outstanding_amount,
+			si.is_return,
+			si.return_against,
 			c.mobile_no
 		FROM `tabSales Invoice` si
 		LEFT JOIN `tabCustomer` c ON c.name = si.customer
@@ -276,10 +285,7 @@ def get_customer_data(filters):
 	customer_invoices = {}
 	customer_info_map = {}
 	for inv in invoices:
-		days = date_diff(as_on_date, inv.posting_date)
-		if days < min_days:
-			continue
-		inv["days"] = days
+		inv["days"] = date_diff(as_on_date, inv.posting_date)
 		terr = inv.territory or "General"
 		customer_invoices.setdefault((terr, inv.customer), []).append(inv)
 		customer_info_map[inv.customer] = inv
@@ -291,7 +297,19 @@ def get_customer_data(filters):
 			customer_invoices[(terr, cust_id)] = []
 			customer_info_map[cust_id] = first_adv
 
+	# Filter by min_days if specified
+	if min_days > 0:
+		filtered_customer_invoices = {}
+		for key, inv_list in customer_invoices.items():
+			if any(inv.get("days", 0) >= min_days for inv in inv_list if not inv.get("is_return")):
+				qualifying_invs = [inv for inv in inv_list if inv.get("days", 0) >= min_days or inv.get("is_return")]
+				filtered_customer_invoices[key] = qualifying_invs
+		customer_invoices = filtered_customer_invoices
+
 	data = []
+	grand_total_invoiced = 0.0
+	grand_total_outstanding = 0.0
+
 	for (terr, cust), inv_list in sorted(customer_invoices.items(), key=lambda x: (x[0][0], x[0][1])):
 		first = inv_list[0] if inv_list else customer_info_map.get(cust)
 		if not first:
@@ -327,14 +345,28 @@ def get_customer_data(filters):
 		subtotal_outstanding = 0.0
 
 		for inv in inv_list:
+			is_return = cint(inv.get("is_return"))
 			inv_amt = flt(inv.invoiced_amount, 2)
 			out_amt = flt(inv.outstanding_amount, 2)
+
+			if is_return:
+				if inv_amt > 0:
+					inv_amt = -inv_amt
+				if out_amt > 0:
+					out_amt = -out_amt
+
 			subtotal_invoiced += inv_amt
 			subtotal_outstanding += out_amt
 
+			row_label = ""
+			if is_return:
+				row_label = _("Sales Return")
+				if inv.get("return_against"):
+					row_label += f" ({inv.get('return_against')})"
+
 			data.append({
-				"party_details": "",
-				"customer_details": "",
+				"party_details": row_label,
+				"customer_details": row_label,
 				"group_or_territory": inv.territory,
 				"territory": inv.territory,
 				"voucher_type": inv.voucher_type,
@@ -343,6 +375,7 @@ def get_customer_data(filters):
 				"invoiced_amount": inv_amt,
 				"outstanding_amount": out_amt,
 				"days": inv.days,
+				"is_return": is_return,
 			})
 
 		# List unallocated advance payments received
@@ -370,7 +403,7 @@ def get_customer_data(filters):
 		net_outstanding = flt(subtotal_outstanding - subtotal_advances, 2)
 
 		subtotal_label = f"Subtotal ({first.customer_name})"
-		if subtotal_advances > 0 and net_outstanding < 0:
+		if (subtotal_advances > 0 or subtotal_outstanding < 0) and net_outstanding < 0:
 			subtotal_label += " [Credit Balance]"
 
 		data.append({
@@ -387,6 +420,25 @@ def get_customer_data(filters):
 			"is_subtotal": 1,
 		})
 
+		grand_total_invoiced += subtotal_invoiced
+		grand_total_outstanding += net_outstanding
+
+	if data:
+		data.append({
+			"party_details": _("Total"),
+			"customer_details": _("Total"),
+			"group_or_territory": "",
+			"territory": "",
+			"voucher_type": "",
+			"voucher_no": "",
+			"posting_date": None,
+			"invoiced_amount": flt(grand_total_invoiced, 2),
+			"outstanding_amount": flt(grand_total_outstanding, 2),
+			"days": None,
+			"is_grand_total": 1,
+			"bold": 1,
+		})
+
 	return data
 
 
@@ -395,8 +447,8 @@ def get_supplier_data(filters):
 	min_days = int(filters.get("min_days") or 0)
 	include_advances = filters.get("include_advances", 1)
 
-	# 1. Fetch Unpaid Purchase Invoices
-	pi_conditions = ["pi.docstatus = 1", "pi.outstanding_amount > 0"]
+	# 1. Fetch Unpaid Purchase Invoices and Debit Notes / Returns
+	pi_conditions = ["pi.docstatus = 1", "pi.outstanding_amount != 0"]
 	values = {"as_on_date": as_on_date}
 
 	if filters.get("company"):
@@ -429,6 +481,8 @@ def get_supplier_data(filters):
 			COALESCE(NULLIF(pi.supplier_group, ''), s.supplier_group) as supplier_group,
 			pi.grand_total as invoiced_amount,
 			pi.outstanding_amount,
+			pi.is_return,
+			pi.return_against,
 			s.mobile_no
 		FROM `tabPurchase Invoice` pi
 		LEFT JOIN `tabSupplier` s ON s.name = pi.supplier
@@ -507,10 +561,7 @@ def get_supplier_data(filters):
 	supplier_invoices = {}
 	supplier_info_map = {}
 	for inv in invoices:
-		days = date_diff(as_on_date, inv.posting_date)
-		if days < min_days:
-			continue
-		inv["days"] = days
+		inv["days"] = date_diff(as_on_date, inv.posting_date)
 		grp = inv.supplier_group or "All Supplier Groups"
 		supplier_invoices.setdefault((grp, inv.supplier), []).append(inv)
 		supplier_info_map[inv.supplier] = inv
@@ -522,7 +573,19 @@ def get_supplier_data(filters):
 			supplier_invoices[(grp, supp_id)] = []
 			supplier_info_map[supp_id] = first_adv
 
+	# Filter by min_days if specified
+	if min_days > 0:
+		filtered_supplier_invoices = {}
+		for key, inv_list in supplier_invoices.items():
+			if any(inv.get("days", 0) >= min_days for inv in inv_list if not inv.get("is_return")):
+				qualifying_invs = [inv for inv in inv_list if inv.get("days", 0) >= min_days or inv.get("is_return")]
+				filtered_supplier_invoices[key] = qualifying_invs
+		supplier_invoices = filtered_supplier_invoices
+
 	data = []
+	grand_total_invoiced = 0.0
+	grand_total_outstanding = 0.0
+
 	for (grp, supp), inv_list in sorted(supplier_invoices.items(), key=lambda x: (x[0][0], x[0][1])):
 		first = inv_list[0] if inv_list else supplier_info_map.get(supp)
 		if not first:
@@ -558,24 +621,39 @@ def get_supplier_data(filters):
 		subtotal_outstanding = 0.0
 
 		for inv in inv_list:
+			is_return = cint(inv.get("is_return"))
 			inv_amt = flt(inv.invoiced_amount, 2)
 			out_amt = flt(inv.outstanding_amount, 2)
+
+			if is_return:
+				if inv_amt > 0:
+					inv_amt = -inv_amt
+				if out_amt > 0:
+					out_amt = -out_amt
+
 			subtotal_invoiced += inv_amt
 			subtotal_outstanding += out_amt
 
+			row_label = ""
+			if is_return:
+				row_label = _("Purchase Return")
+				if inv.get("return_against"):
+					row_label += f" ({inv.get('return_against')})"
+
 			data.append({
-				"party_details": "",
-				"customer_details": "",
+				"party_details": row_label,
+				"customer_details": row_label,
 				"group_or_territory": inv.supplier_group,
 				"territory": inv.supplier_group,
 				"voucher_type": inv.voucher_type,
 				"voucher_no": inv.voucher_no,
-				"bill_no": inv.bill_no,
+				"bill_no": inv.bill_no or ("-" if is_return else ""),
 				"bill_date": inv.bill_date,
 				"posting_date": inv.posting_date,
 				"invoiced_amount": inv_amt,
 				"outstanding_amount": out_amt,
 				"days": inv.days,
+				"is_return": is_return,
 			})
 
 		# List unallocated advance payments paid to this supplier
@@ -605,7 +683,7 @@ def get_supplier_data(filters):
 		net_outstanding = flt(subtotal_outstanding - subtotal_advances, 2)
 
 		subtotal_label = f"Subtotal ({first.supplier_name})"
-		if subtotal_advances > 0 and net_outstanding < 0:
+		if (subtotal_advances > 0 or subtotal_outstanding < 0) and net_outstanding < 0:
 			subtotal_label += " [Supplier Credit / Excess Paid]"
 
 		data.append({
@@ -622,6 +700,27 @@ def get_supplier_data(filters):
 			"outstanding_amount": net_outstanding,
 			"days": None,
 			"is_subtotal": 1,
+		})
+
+		grand_total_invoiced += subtotal_invoiced
+		grand_total_outstanding += net_outstanding
+
+	if data:
+		data.append({
+			"party_details": _("Total"),
+			"customer_details": _("Total"),
+			"group_or_territory": "",
+			"territory": "",
+			"voucher_type": "",
+			"voucher_no": "",
+			"bill_no": "",
+			"bill_date": None,
+			"posting_date": None,
+			"invoiced_amount": flt(grand_total_invoiced, 2),
+			"outstanding_amount": flt(grand_total_outstanding, 2),
+			"days": None,
+			"is_grand_total": 1,
+			"bold": 1,
 		})
 
 	return data
