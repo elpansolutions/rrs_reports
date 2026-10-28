@@ -153,26 +153,26 @@
             <tr>
                 <th style="width: 25px;">#</th>
                 <th style="width: 80px;">{%= __("Item Code") %}</th>
-                <th style="width: 160px; text-align: left; padding-left: 4px;">{%= __("Product Name") %}</th>
+                <th style="width: 150px; text-align: left; padding-left: 4px;">{%= __("Product Name") %}</th>
                 <th style="width: 40px;">{%= __("Packg") %}</th>
-                <th style="width: 50px;">{%= __("Open Qty") %}</th>
+                <th style="width: 48px;">{%= __("Open Qty") %}</th>
                 <th style="width: 45px;">{%= __("Open Free") %}</th>
-                <th style="width: 50px;">{%= __("Rec Qty") %}</th>
+                <th style="width: 48px;">{%= __("Rec Qty") %}</th>
                 <th style="width: 45px;">{%= __("Rec Free") %}</th>
-                <th style="width: 55px;">{%= __("Last Mo") %}</th>
-                <th style="width: 50px;">{%= __("Sales Qty") %}</th>
+                <th style="width: 50px;">{%= __("Last Mo") %}</th>
+                <th style="width: 48px;">{%= __("Sales Qty") %}</th>
                 <th style="width: 45px;">{%= __("Sales Free") %}</th>
+                <th style="width: 65px;">{%= __("Sales Value") %}</th>
                 <th style="width: 40px;">{%= __("Adjmt") %}</th>
-                <th style="width: 55px;">{%= __("Closing Qty") %}</th>
+                <th style="width: 52px;">{%= __("Closing Qty") %}</th>
                 <th style="width: 45px;">{%= __("Close Free") %}</th>
-                <th style="width: 70px;">{%= __("Closing Value") %}</th>
+                <th style="width: 68px;">{%= __("Closing Value") %}</th>
                 <th style="width: 45px;">{%= __("Age Days") %}</th>
             </tr>
         </thead>
         <tbody>
             {% 
                 var item_index = 0;
-                var tot_opening_val = 0.0;
                 var tot_purchase_val = 0.0;
                 var tot_sales_val = 0.0;
                 var tot_closing_val = 0.0;
@@ -182,7 +182,6 @@
                     var row = data[i];
                     if (row.is_summary_row) {
                         // Extract summary values if calculated
-                        if (row.item_name && row.item_name.indexOf("Opening Value") !== -1) tot_opening_val = row.closing_value || 0.0;
                         if (row.item_name && row.item_name.indexOf("Purchase Value") !== -1) tot_purchase_val = row.closing_value || 0.0;
                         if (row.item_name && row.item_name.indexOf("Sales Value") !== -1) tot_sales_val = row.closing_value || 0.0;
                         if (row.item_name && row.item_name.indexOf("Closing Value") !== -1) tot_closing_val = row.closing_value || 0.0;
@@ -203,6 +202,7 @@
                 <td class="text-right">{%= row.sales_last ? format_number(row.sales_last, null, 2) : "-" %}</td>
                 <td class="text-right">{%= row.sales_qty ? format_number(row.sales_qty, null, 2) : "-" %}</td>
                 <td class="text-right">{%= row.sales_free ? format_number(row.sales_free, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= row.sales_value != null ? format_currency(row.sales_value, currency) : "-" %}</td>
                 <td class="text-right">{%= row.adjmt ? format_number(row.adjmt, null, 2) : "-" %}</td>
                 <td class="text-right bold">{%= row.closing_qty ? format_number(row.closing_qty, null, 2) : "-" %}</td>
                 <td class="text-right">{%= row.closing_free ? format_number(row.closing_free, null, 2) : "-" %}</td>
@@ -220,22 +220,16 @@
         </div>
         <table class="summary-grid">
             <tr>
-                <td class="summary-label" style="width: 20%;">{%= __("Opening Value") %}</td>
-                <td class="summary-val" style="width: 30%; color: #0284c7;">{%= format_currency(tot_opening_val, currency) %}</td>
                 <td class="summary-label" style="width: 20%;">{%= __("Purchase Value") %}</td>
                 <td class="summary-val" style="width: 30%; color: #7c3aed;">{%= format_currency(tot_purchase_val, currency) %}</td>
+                <td class="summary-label" style="width: 20%;">{%= __("Sales Value") %}</td>
+                <td class="summary-val" style="width: 30%; color: #ea580c;">{%= format_currency(tot_sales_val, currency) %}</td>
             </tr>
             <tr>
-                <td class="summary-label">{%= __("Sales Value") %}</td>
-                <td class="summary-val" style="color: #ea580c;">{%= format_currency(tot_sales_val, currency) %}</td>
                 <td class="summary-label">{%= __("Closing Value") %}</td>
                 <td class="summary-val" style="color: #047857; font-size: 10px;">{%= format_currency(tot_closing_val, currency) %}</td>
-            </tr>
-            <tr>
                 <td class="summary-label">{%= __("Last Month Sales") %}</td>
                 <td class="summary-val" style="color: #475569;">{%= format_currency(tot_last_month_sales, currency) %}</td>
-                <td style="border: none;"></td>
-                <td style="border: none;"></td>
             </tr>
         </table>
     </div>

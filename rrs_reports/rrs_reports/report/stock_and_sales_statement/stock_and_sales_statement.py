@@ -9,6 +9,13 @@ from frappe.utils import add_days, add_months, date_diff, flt, getdate, nowdate
 def execute(filters=None):
 	if not filters:
 		filters = {}
+	elif isinstance(filters, str):
+		import json
+
+		try:
+			filters = json.loads(filters)
+		except Exception:
+			filters = {}
 
 	columns = get_columns()
 	data, report_summary = get_data(filters)
@@ -84,6 +91,12 @@ def get_columns():
 			"fieldtype": "Float",
 			"precision": 2,
 			"width": 100,
+		},
+		{
+			"label": _("Sales Value"),
+			"fieldname": "sales_value",
+			"fieldtype": "Currency",
+			"width": 115,
 		},
 		{
 			"label": _("Adjmt"),
@@ -231,7 +244,8 @@ def get_data(filters):
 		SELECT
 			sii.item_code,
 			SUM(sii.qty) as billed_qty,
-			{free_qty_expr} as free_qty
+			{free_qty_expr} as free_qty,
+			COALESCE(SUM(sii.base_net_amount), SUM(sii.amount), 0) as sales_amount
 		FROM `tabSales Invoice Item` sii
 		INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
 		WHERE sii.item_code IN %s
@@ -242,7 +256,14 @@ def get_data(filters):
 		(tuple(item_codes), from_date, to_date),
 		as_dict=True,
 	)
-	sales_map = {r.item_code: {"qty": flt(r.billed_qty), "free": flt(r.free_qty)} for r in sales_rows}
+	sales_map = {
+		r.item_code: {
+			"qty": flt(r.billed_qty),
+			"free": flt(r.free_qty),
+			"amount": flt(r.sales_amount),
+		}
+		for r in sales_rows
+	}
 
 	# 4. Last Month Sales
 	last_month_rows = frappe.db.sql(
@@ -298,7 +319,6 @@ def get_data(filters):
 	bin_map = {b.item_code: {"qty": flt(b.actual_qty), "val_rate": flt(b.val_rate)} for b in bins}
 
 	data = []
-	tot_opening_val = 0.0
 	tot_purchase_val = 0.0
 	tot_sales_val = 0.0
 	tot_closing_val = 0.0
@@ -310,9 +330,12 @@ def get_data(filters):
 
 		op_qty = opening_map.get(code, 0.0)
 		rec_qty = receipt_map.get(code, 0.0)
-		s_info = sales_map.get(code, {"qty": 0.0, "free": 0.0})
+		s_info = sales_map.get(code, {"qty": 0.0, "free": 0.0, "amount": 0.0})
 		s_qty = s_info["qty"]
 		s_free = s_info["free"]
+		s_val = flt(s_info.get("amount"), 2)
+		if s_val == 0.0 and s_qty > 0:
+			s_val = flt(s_qty * val_rate, 2)
 		s_last = last_month_map.get(code, 0.0)
 
 		# Closing stock from bins or formula
@@ -334,9 +357,8 @@ def get_data(filters):
 		if op_qty == 0 and rec_qty == 0 and s_qty == 0 and closing_qty == 0:
 			continue
 
-		tot_opening_val += op_qty * val_rate
 		tot_purchase_val += rec_qty * val_rate
-		tot_sales_val += s_qty * val_rate
+		tot_sales_val += s_val
 		tot_closing_val += closing_value
 		tot_last_month_sales += s_last * val_rate
 
@@ -351,6 +373,7 @@ def get_data(filters):
 			"sales_last": s_last,
 			"sales_qty": s_qty,
 			"sales_free": s_free,
+			"sales_value": s_val,
 			"adjmt": 0.0,
 			"closing_qty": closing_qty,
 			"closing_free": 0.0,
@@ -361,7 +384,6 @@ def get_data(filters):
 		data.append(row)
 
 	report_summary = [
-		{"label": _("Opening Value"), "value": flt(tot_opening_val, 2), "datatype": "Currency"},
 		{"label": _("Purchase Value"), "value": flt(tot_purchase_val, 2), "datatype": "Currency"},
 		{"label": _("Sales Value"), "value": flt(tot_sales_val, 2), "datatype": "Currency"},
 		{"label": _("Closing Value"), "value": flt(tot_closing_val, 2), "datatype": "Currency"},
@@ -376,7 +398,6 @@ def get_data(filters):
 		})
 
 		summary_items = [
-			(_("Opening Value"), tot_opening_val),
 			(_("Purchase Value"), tot_purchase_val),
 			(_("Sales Value"), tot_sales_val),
 			(_("Closing Value"), tot_closing_val),

@@ -45,7 +45,7 @@ frappe.query_reports["Stock and Sales Statement"] = {
 			if (column.fieldname === "item_name") {
 				return `<span style="font-weight: bold; color: #0f172a; font-size: 11px;">${value || ""}</span>`;
 			}
-			if (column.fieldname === "closing_value" && value != null && value !== "") {
+			if ((column.fieldname === "closing_value" || column.fieldname === "sales_value") && value != null && value !== "") {
 				return `<span style="font-weight: bold; color: #047857; font-size: 11px;">${default_formatter(value, row, column, data)}</span>`;
 			}
 			return "";
