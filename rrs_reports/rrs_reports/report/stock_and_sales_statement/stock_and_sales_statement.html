@@ -159,6 +159,7 @@
                 <th style="width: 45px;">{%= __("Open Free") %}</th>
                 <th style="width: 48px;">{%= __("Rec Qty") %}</th>
                 <th style="width: 45px;">{%= __("Rec Free") %}</th>
+                <th style="width: 65px;">{%= __("Purchase Value") %}</th>
                 <th style="width: 50px;">{%= __("Last Mo") %}</th>
                 <th style="width: 48px;">{%= __("Sales Qty") %}</th>
                 <th style="width: 45px;">{%= __("Sales Free") %}</th>
@@ -173,22 +174,38 @@
         <tbody>
             {% 
                 var item_index = 0;
+                var tot_open_qty = 0.0;
+                var tot_open_free = 0.0;
+                var tot_receipt_qty = 0.0;
+                var tot_receipt_free = 0.0;
                 var tot_purchase_val = 0.0;
+                var tot_sales_last = 0.0;
+                var tot_sales_qty = 0.0;
+                var tot_sales_free = 0.0;
                 var tot_sales_val = 0.0;
+                var tot_adjmt = 0.0;
+                var tot_closing_qty = 0.0;
+                var tot_closing_free = 0.0;
                 var tot_closing_val = 0.0;
                 var tot_last_month_sales = 0.0;
 
                 for (var i = 0; i < data.length; i++) {
                     var row = data[i];
-                    if (row.is_summary_row) {
-                        // Extract summary values if calculated
-                        if (row.item_name && row.item_name.indexOf("Purchase Value") !== -1) tot_purchase_val = row.closing_value || 0.0;
-                        if (row.item_name && row.item_name.indexOf("Sales Value") !== -1) tot_sales_val = row.closing_value || 0.0;
-                        if (row.item_name && row.item_name.indexOf("Closing Value") !== -1) tot_closing_val = row.closing_value || 0.0;
-                        if (row.item_name && row.item_name.indexOf("Last Month Sales") !== -1) tot_last_month_sales = row.closing_value || 0.0;
-                        continue;
-                    }
                     item_index++;
+                    tot_open_qty += (row.opening_qty || 0.0);
+                    tot_open_free += (row.opening_free || 0.0);
+                    tot_receipt_qty += (row.receipt_qty || 0.0);
+                    tot_receipt_free += (row.receipt_free || 0.0);
+                    tot_purchase_val += (row.purchase_value || 0.0);
+                    tot_sales_last += (row.sales_last || 0.0);
+                    tot_sales_qty += (row.sales_qty || 0.0);
+                    tot_sales_free += (row.sales_free || 0.0);
+                    tot_sales_val += (row.sales_value || 0.0);
+                    tot_adjmt += (row.adjmt || 0.0);
+                    tot_closing_qty += (row.closing_qty || 0.0);
+                    tot_closing_free += (row.closing_free || 0.0);
+                    tot_closing_val += (row.closing_value || 0.0);
+                    tot_last_month_sales += (row.last_month_val || 0.0);
             %}
             <tr class="{%= row.is_non_moving ? 'non-moving' : '' %}">
                 <td class="text-center">{%= item_index %}</td>
@@ -199,6 +216,7 @@
                 <td class="text-right">{%= row.opening_free ? format_number(row.opening_free, null, 2) : "-" %}</td>
                 <td class="text-right">{%= row.receipt_qty ? format_number(row.receipt_qty, null, 2) : "-" %}</td>
                 <td class="text-right">{%= row.receipt_free ? format_number(row.receipt_free, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= row.purchase_value != null ? format_currency(row.purchase_value, currency) : "-" %}</td>
                 <td class="text-right">{%= row.sales_last ? format_number(row.sales_last, null, 2) : "-" %}</td>
                 <td class="text-right">{%= row.sales_qty ? format_number(row.sales_qty, null, 2) : "-" %}</td>
                 <td class="text-right">{%= row.sales_free ? format_number(row.sales_free, null, 2) : "-" %}</td>
@@ -211,6 +229,25 @@
             </tr>
             {% } %}
         </tbody>
+        <tfoot>
+            <tr style="font-weight: bold; background: #f8fafc; border-top: 1.5px solid #000;">
+                <td colspan="4" class="text-right bold">{%= __("Total") %}</td>
+                <td class="text-right bold">{%= tot_open_qty ? format_number(tot_open_qty, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= tot_open_free ? format_number(tot_open_free, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= tot_receipt_qty ? format_number(tot_receipt_qty, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= tot_receipt_free ? format_number(tot_receipt_free, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= format_currency(tot_purchase_val, currency) %}</td>
+                <td class="text-right bold">{%= tot_sales_last ? format_number(tot_sales_last, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= tot_sales_qty ? format_number(tot_sales_qty, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= tot_sales_free ? format_number(tot_sales_free, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= format_currency(tot_sales_val, currency) %}</td>
+                <td class="text-right bold">{%= tot_adjmt ? format_number(tot_adjmt, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= tot_closing_qty ? format_number(tot_closing_qty, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= tot_closing_free ? format_number(tot_closing_free, null, 2) : "-" %}</td>
+                <td class="text-right bold">{%= format_currency(tot_closing_val, currency) %}</td>
+                <td></td>
+            </tr>
+        </tfoot>
     </table>
 
     <!-- SUMMARY SECTION -->

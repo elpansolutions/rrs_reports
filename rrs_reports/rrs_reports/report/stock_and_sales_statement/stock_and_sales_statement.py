@@ -72,6 +72,12 @@ def get_columns():
 			"width": 105,
 		},
 		{
+			"label": _("Purchase Value"),
+			"fieldname": "purchase_value",
+			"fieldtype": "Currency",
+			"width": 115,
+		},
+		{
 			"label": _("Last Mo. Sales"),
 			"fieldname": "sales_last",
 			"fieldtype": "Float",
@@ -357,10 +363,13 @@ def get_data(filters):
 		if op_qty == 0 and rec_qty == 0 and s_qty == 0 and closing_qty == 0:
 			continue
 
-		tot_purchase_val += rec_qty * val_rate
+		purchase_val = flt(rec_qty * val_rate, 2)
+		last_month_val = flt(s_last * val_rate, 2)
+
+		tot_purchase_val += purchase_val
 		tot_sales_val += s_val
 		tot_closing_val += closing_value
-		tot_last_month_sales += s_last * val_rate
+		tot_last_month_sales += last_month_val
 
 		row = {
 			"item_code": code,
@@ -370,6 +379,7 @@ def get_data(filters):
 			"opening_free": 0.0,
 			"receipt_qty": rec_qty,
 			"receipt_free": 0.0,
+			"purchase_value": purchase_val,
 			"sales_last": s_last,
 			"sales_qty": s_qty,
 			"sales_free": s_free,
@@ -380,6 +390,7 @@ def get_data(filters):
 			"closing_value": closing_value,
 			"age_days": age_str,
 			"is_non_moving": is_non_moving,
+			"last_month_val": last_month_val,
 		}
 		data.append(row)
 
@@ -389,29 +400,5 @@ def get_data(filters):
 		{"label": _("Closing Value"), "value": flt(tot_closing_val, 2), "datatype": "Currency"},
 		{"label": _("Last Month Sales"), "value": flt(tot_last_month_sales, 2), "datatype": "Currency"},
 	]
-
-	if data:
-		data.append({
-			"item_code": "",
-			"item_name": "",
-			"is_summary_row": 1,
-		})
-
-		summary_items = [
-			(_("Purchase Value"), tot_purchase_val),
-			(_("Sales Value"), tot_sales_val),
-			(_("Closing Value"), tot_closing_val),
-			(_("Last Month Sales"), tot_last_month_sales),
-		]
-
-		for label, val in summary_items:
-			data.append({
-				"item_code": "",
-				"item_name": label,
-				"stock_uom": "",
-				"closing_value": flt(val, 2),
-				"is_summary_row": 1,
-				"bold": 1,
-			})
 
 	return data, report_summary
