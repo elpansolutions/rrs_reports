@@ -11,9 +11,9 @@ def execute(filters=None):
 		filters = {}
 
 	columns = get_columns()
-	data = get_data(filters)
+	data, report_summary = get_data(filters)
 
-	return columns, data
+	return columns, data, None, None, report_summary
 
 
 def get_columns():
@@ -28,32 +28,32 @@ def get_columns():
 			"label": _("Product Name"),
 			"fieldname": "item_name",
 			"fieldtype": "Data",
-			"width": 280,
+			"width": 260,
 		},
 		{
-			"label": _("Packg"),
+			"label": _("UOMs"),
 			"fieldname": "stock_uom",
 			"fieldtype": "Data",
-			"width": 90,
+			"width": 80,
 		},
 		{
 			"label": _("Closing Stock"),
 			"fieldname": "closing_stock",
 			"fieldtype": "Float",
 			"precision": 2,
-			"width": 120,
-		},
-		{
-			"label": _("Excess"),
-			"fieldname": "excess",
-			"fieldtype": "Data",
 			"width": 110,
 		},
 		{
-			"label": _("Shortage"),
-			"fieldname": "shortage",
-			"fieldtype": "Data",
-			"width": 110,
+			"label": _("Avg Purchase Price"),
+			"fieldname": "avg_purchase_price",
+			"fieldtype": "Currency",
+			"width": 140,
+		},
+		{
+			"label": _("Total Value"),
+			"fieldname": "total_value",
+			"fieldtype": "Currency",
+			"width": 140,
 		},
 	]
 
@@ -102,7 +102,9 @@ def get_data(filters):
 			it.name as item_code,
 			it.item_name,
 			it.stock_uom,
-			COALESCE(NULLIF(it.brand, ''), 'General / Unbranded') as brand
+			COALESCE(NULLIF(it.brand, ''), 'General / Unbranded') as brand,
+			it.valuation_rate,
+			it.last_purchase_rate
 		FROM `tabItem` it
 		WHERE {where_clause}
 		ORDER BY brand ASC, it.name ASC
@@ -112,11 +114,11 @@ def get_data(filters):
 	)
 
 	if not items:
-		return []
+		return [], []
 
 	item_codes = [it.item_code for it in items]
 
-	# Calculate closing stock per item
+	# Calculate closing stock and valuation from tabBin
 	bin_conditions = ["item_code IN %s"]
 	bin_values = [tuple(item_codes)]
 
@@ -126,7 +128,11 @@ def get_data(filters):
 
 	bins = frappe.db.sql(
 		f"""
-		SELECT item_code, SUM(actual_qty) as total_qty
+		SELECT 
+			item_code, 
+			SUM(actual_qty) as total_qty,
+			SUM(stock_value) as total_stock_value,
+			AVG(valuation_rate) as avg_val_rate
 		FROM `tabBin`
 		WHERE {' AND '.join(bin_conditions)}
 		GROUP BY item_code
@@ -135,15 +141,79 @@ def get_data(filters):
 		as_dict=True,
 	)
 
-	stock_map = {b.item_code: flt(b.total_qty) for b in bins}
+	bin_map = {}
+	for b in bins:
+		qty = flt(b.total_qty)
+		val = flt(b.total_stock_value)
+		rate = flt(b.avg_val_rate)
+		if qty > 0 and val > 0:
+			rate = val / qty
+		bin_map[b.item_code] = {
+			"qty": qty,
+			"val": val,
+			"rate": rate,
+		}
+
+	# Purchase Invoice weighted average rate map as secondary fallback
+	pi_rates = frappe.db.sql(
+		"""
+		SELECT 
+			pii.item_code,
+			SUM(pii.base_net_amount) / SUM(pii.qty) as avg_rate
+		FROM `tabPurchase Invoice Item` pii
+		JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+		WHERE pi.docstatus = 1 AND pii.qty > 0 AND pii.item_code IN %s
+		GROUP BY pii.item_code
+	""",
+		(tuple(item_codes),),
+		as_dict=True,
+	)
+	pi_map = {r.item_code: flt(r.avg_rate) for r in pi_rates}
+
+	# Purchase Receipt weighted average rate map as tertiary fallback
+	pr_rates = frappe.db.sql(
+		"""
+		SELECT 
+			pri.item_code,
+			SUM(pri.base_net_amount) / SUM(pri.qty) as avg_rate
+		FROM `tabPurchase Receipt Item` pri
+		JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
+		WHERE pr.docstatus = 1 AND pri.qty > 0 AND pri.item_code IN %s
+		GROUP BY pri.item_code
+	""",
+		(tuple(item_codes),),
+		as_dict=True,
+	)
+	pr_map = {r.item_code: flt(r.avg_rate) for r in pr_rates}
 
 	# Group items by brand
+	tot_qty = 0.0
+	tot_val = 0.0
 	items_by_brand = {}
+
 	for it in items:
-		qty = stock_map.get(it.item_code, 0.0)
+		code = it.item_code
+		bin_info = bin_map.get(code, {})
+		qty = bin_info.get("qty", 0.0)
+
 		if not show_zero_stock and qty <= 0:
 			continue
+
+		# Determine average purchase price
+		rate = bin_info.get("rate") or 0.0
+		if rate <= 0:
+			rate = pi_map.get(code) or pr_map.get(code) or flt(it.last_purchase_rate) or flt(it.valuation_rate)
+
+		avg_purchase_price = flt(rate, 2)
+		total_value = flt(qty * avg_purchase_price, 2) if qty > 0 else 0.0
+
 		it["closing_stock"] = qty
+		it["avg_purchase_price"] = avg_purchase_price
+		it["total_value"] = total_value
+
+		tot_qty += qty
+		tot_val += total_value
+
 		items_by_brand.setdefault(it.brand, []).append(it)
 
 	data = []
@@ -157,8 +227,8 @@ def get_data(filters):
 			"item_name": "",
 			"stock_uom": "",
 			"closing_stock": None,
-			"excess": "",
-			"shortage": "",
+			"avg_purchase_price": None,
+			"total_value": None,
 			"is_brand_header": 1,
 		})
 
@@ -168,8 +238,13 @@ def get_data(filters):
 				"item_name": it.item_name,
 				"stock_uom": it.stock_uom,
 				"closing_stock": it.closing_stock,
-				"excess": "[   ]",
-				"shortage": "[   ]",
+				"avg_purchase_price": it.avg_purchase_price,
+				"total_value": it.total_value,
 			})
 
-	return data
+	report_summary = [
+		{"label": _("Total Closing Stock Qty"), "value": flt(tot_qty, 2), "datatype": "Float"},
+		{"label": _("Total Stock Value"), "value": flt(tot_val, 2), "datatype": "Currency"},
+	]
+
+	return data, report_summary

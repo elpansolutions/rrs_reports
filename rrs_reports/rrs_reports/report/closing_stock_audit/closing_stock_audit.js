@@ -46,19 +46,15 @@ frappe.query_reports["Closing Stock Audit"] = {
 		}
 	],
 	formatter: function (value, row, column, data, default_formatter) {
-		if (column.fieldname === "item_code") {
-			if (data && data.is_brand_header) {
+		if (data && data.is_brand_header) {
+			if (column.fieldname === "item_code") {
 				return `<span style="font-weight: bold; color: #047857; font-size: 13px;">${value}</span>`;
-			}
-			if (value) {
-				return `<a class="grey" href="/app/item/${encodeURIComponent(value)}" data-doctype="Item">${frappe.utils.escape_html(value)}</a>`;
 			}
 			return "";
 		}
-		value = default_formatter(value, row, column, data);
-		if (data && data.is_brand_header) {
-			value = `<span style="font-weight: bold; color: #047857; font-size: 13px;">${value}</span>`;
+		if (column.fieldname === "item_code" && value) {
+			return `<a class="grey" href="/app/item/${encodeURIComponent(value)}" data-doctype="Item">${frappe.utils.escape_html(value)}</a>`;
 		}
-		return value;
+		return default_formatter(value, row, column, data);
 	}
 };
