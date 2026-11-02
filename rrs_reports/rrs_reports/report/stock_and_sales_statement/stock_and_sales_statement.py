@@ -49,41 +49,27 @@ def get_columns():
 			"fieldname": "opening_qty",
 			"fieldtype": "Float",
 			"precision": 2,
-			"width": 105,
-		},
-		{
-			"label": _("Opening Free"),
-			"fieldname": "opening_free",
-			"fieldtype": "Float",
-			"precision": 2,
-			"width": 105,
+			"width": 110,
 		},
 		{
 			"label": _("Receipt Qty"),
 			"fieldname": "receipt_qty",
 			"fieldtype": "Float",
 			"precision": 2,
-			"width": 105,
-		},
-		{
-			"label": _("Receipt Free"),
-			"fieldname": "receipt_free",
-			"fieldtype": "Float",
-			"precision": 2,
-			"width": 105,
+			"width": 110,
 		},
 		{
 			"label": _("Purchase Value"),
 			"fieldname": "purchase_value",
 			"fieldtype": "Currency",
-			"width": 115,
+			"width": 120,
 		},
 		{
 			"label": _("Last Mo. Sales"),
 			"fieldname": "sales_last",
 			"fieldtype": "Float",
 			"precision": 2,
-			"width": 115,
+			"width": 110,
 		},
 		{
 			"label": _("Sales Qty"),
@@ -103,7 +89,7 @@ def get_columns():
 			"label": _("Sales Value"),
 			"fieldname": "sales_value",
 			"fieldtype": "Currency",
-			"width": 115,
+			"width": 120,
 		},
 		{
 			"label": _("Adjmt"),
@@ -117,14 +103,7 @@ def get_columns():
 			"fieldname": "closing_qty",
 			"fieldtype": "Float",
 			"precision": 2,
-			"width": 110,
-		},
-		{
-			"label": _("Closing Free"),
-			"fieldname": "closing_free",
-			"fieldtype": "Float",
-			"precision": 2,
-			"width": 105,
+			"width": 115,
 		},
 		{
 			"label": _("Closing Value"),
@@ -199,7 +178,8 @@ def get_data(filters):
 
 	item_codes = [it.item_code for it in items]
 
-	# 1. Opening Stock from Stock Ledger before from_date
+	# 1. Opening Stock before from_date
+	# Base SLE opening balance
 	sle_wh_cond = ""
 	sle_wh_val = [tuple(item_codes), from_date]
 	if filters.get("company"):
@@ -221,32 +201,143 @@ def get_data(filters):
 	)
 	opening_map = {r.item_code: flt(r.opening_qty) for r in opening_rows}
 
-	# 2. Inward Receipts (Purchases) between from_date and to_date
-	receipt_wh_cond = ""
-	receipt_wh_val = [tuple(item_codes), from_date, to_date]
+	# Include opening free quantities from past purchases & sales before from_date
+	op_pi_cond = ["pii.item_code IN %s", "pi.posting_date < %s", "pi.docstatus = 1"]
+	op_pi_val = [tuple(item_codes), from_date]
 	if filters.get("company"):
-		receipt_wh_cond += " AND company = %s"
-		receipt_wh_val.append(filters.get("company"))
+		op_pi_cond.append("pi.company = %s")
+		op_pi_val.append(filters.get("company"))
 	if filters.get("warehouse"):
-		receipt_wh_cond += " AND warehouse = %s"
-		receipt_wh_val.append(filters.get("warehouse"))
+		op_pi_cond.append("pii.warehouse = %s")
+		op_pi_val.append(filters.get("warehouse"))
 
-	receipt_rows = frappe.db.sql(
+	op_pi_free = frappe.db.sql(
 		f"""
-		SELECT item_code, SUM(actual_qty) as receipt_qty
-		FROM `tabStock Ledger Entry`
-		WHERE item_code IN %s
-		  AND posting_date >= %s AND posting_date <= %s
-		  AND actual_qty > 0
-		  AND voucher_type IN ('Purchase Receipt', 'Purchase Invoice')
-		  AND is_cancelled = 0
-		  {receipt_wh_cond}
-		GROUP BY item_code
+		SELECT pii.item_code, SUM(COALESCE(pii.custom_free_qty, 0)) as free_qty
+		FROM `tabPurchase Invoice Item` pii
+		INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+		WHERE {" AND ".join(op_pi_cond)}
+		GROUP BY pii.item_code
 	""",
-		tuple(receipt_wh_val),
+		tuple(op_pi_val),
 		as_dict=True,
 	)
-	receipt_map = {r.item_code: flt(r.receipt_qty) for r in receipt_rows}
+	for r in op_pi_free:
+		opening_map[r.item_code] = opening_map.get(r.item_code, 0.0) + flt(r.free_qty)
+
+	op_si_cond = ["sii.item_code IN %s", "si.posting_date < %s", "si.docstatus = 1"]
+	op_si_val = [tuple(item_codes), from_date]
+	if filters.get("company"):
+		op_si_cond.append("si.company = %s")
+		op_si_val.append(filters.get("company"))
+	if filters.get("warehouse"):
+		op_si_cond.append("sii.warehouse = %s")
+		op_si_val.append(filters.get("warehouse"))
+
+	op_si_free = frappe.db.sql(
+		f"""
+		SELECT sii.item_code, SUM(COALESCE(sii.custom_free_qty, 0)) as free_qty
+		FROM `tabSales Invoice Item` sii
+		INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+		WHERE {" AND ".join(op_si_cond)}
+		GROUP BY sii.item_code
+	""",
+		tuple(op_si_val),
+		as_dict=True,
+	)
+	for r in op_si_free:
+		opening_map[r.item_code] = opening_map.get(r.item_code, 0.0) - flt(r.free_qty)
+
+	# 2. Inward Receipts (Purchases) between from_date and to_date
+	# Purchase Quantity = Purchased Billed Qty + Free Qty
+	receipt_map = {}
+	purchase_val_map = {}
+
+	pi_cond = [
+		"pii.item_code IN %s",
+		"pi.posting_date >= %s",
+		"pi.posting_date <= %s",
+		"pi.docstatus = 1",
+	]
+	pi_val = [tuple(item_codes), from_date, to_date]
+	if filters.get("company"):
+		pi_cond.append("pi.company = %s")
+		pi_val.append(filters.get("company"))
+	if filters.get("warehouse"):
+		pi_cond.append("pii.warehouse = %s")
+		pi_val.append(filters.get("warehouse"))
+
+	purchase_rows = frappe.db.sql(
+		f"""
+		SELECT
+			pii.item_code,
+			SUM(
+				CASE 
+					WHEN pi.is_return = 1 THEN -(COALESCE(pii.qty, 0) + COALESCE(pii.custom_free_qty, 0))
+					ELSE (COALESCE(pii.qty, 0) + COALESCE(pii.custom_free_qty, 0))
+				END
+			) AS receipt_qty,
+			SUM(
+				CASE 
+					WHEN pi.is_return = 1 THEN -COALESCE(pii.base_net_amount, pii.net_amount, pii.amount, 0)
+					ELSE COALESCE(pii.base_net_amount, pii.net_amount, pii.amount, 0)
+				END
+			) AS purchase_value
+		FROM `tabPurchase Invoice Item` pii
+		INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+		WHERE {" AND ".join(pi_cond)}
+		GROUP BY pii.item_code
+	""",
+		tuple(pi_val),
+		as_dict=True,
+	)
+	for r in purchase_rows:
+		receipt_map[r.item_code] = flt(r.receipt_qty)
+		purchase_val_map[r.item_code] = flt(r.purchase_value)
+
+	# Include standalone Purchase Receipts (where not invoiced)
+	pr_cond = [
+		"pri.item_code IN %s",
+		"pr.posting_date >= %s",
+		"pr.posting_date <= %s",
+		"pr.docstatus = 1",
+		"(pri.purchase_invoice IS NULL OR pri.purchase_invoice = '')",
+	]
+	pr_val = [tuple(item_codes), from_date, to_date]
+	if filters.get("company"):
+		pr_cond.append("pr.company = %s")
+		pr_val.append(filters.get("company"))
+	if filters.get("warehouse"):
+		pr_cond.append("pri.warehouse = %s")
+		pr_val.append(filters.get("warehouse"))
+
+	pr_rows = frappe.db.sql(
+		f"""
+		SELECT
+			pri.item_code,
+			SUM(
+				CASE 
+					WHEN pr.is_return = 1 THEN -(COALESCE(pri.qty, 0) + COALESCE(pri.custom_free_qty, 0))
+					ELSE (COALESCE(pri.qty, 0) + COALESCE(pri.custom_free_qty, 0))
+				END
+			) AS receipt_qty,
+			SUM(
+				CASE 
+					WHEN pr.is_return = 1 THEN -COALESCE(pri.base_net_amount, pri.net_amount, pri.amount, 0)
+					ELSE COALESCE(pri.base_net_amount, pri.net_amount, pri.amount, 0)
+				END
+			) AS purchase_value
+		FROM `tabPurchase Receipt Item` pri
+		INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
+		WHERE {" AND ".join(pr_cond)}
+		GROUP BY pri.item_code
+	""",
+		tuple(pr_val),
+		as_dict=True,
+	)
+	for r in pr_rows:
+		receipt_map[r.item_code] = receipt_map.get(r.item_code, 0.0) + flt(r.receipt_qty)
+		purchase_val_map[r.item_code] = purchase_val_map.get(r.item_code, 0.0) + flt(r.purchase_value)
 
 	# 3. Current Sales (Billed Qty, Free Qty & Sales Amount) between from_date and to_date
 	free_col = None
@@ -294,7 +385,7 @@ def get_data(filters):
 		for r in sales_rows
 	}
 
-	# 4. Last Month Sales (Billed Qty, Free Qty & Sales Amount)
+	# 4. Last Month Sales (Billed Qty + Free Qty & Sales Amount)
 	lm_cond = [
 		"sii.item_code IN %s",
 		"si.posting_date >= %s",
@@ -333,7 +424,35 @@ def get_data(filters):
 		for r in last_month_rows
 	}
 
-	# 5. Last Sale Date (for Age Days)
+	# 5. Stock Adjustments (Stock Reconciliation, Stock Entry) between from_date and to_date
+	adj_cond = [
+		"item_code IN %s",
+		"posting_date >= %s",
+		"posting_date <= %s",
+		"is_cancelled = 0",
+		"voucher_type NOT IN ('Purchase Invoice', 'Purchase Receipt', 'Sales Invoice', 'Delivery Note')",
+	]
+	adj_val = [tuple(item_codes), from_date, to_date]
+	if filters.get("company"):
+		adj_cond.append("company = %s")
+		adj_val.append(filters.get("company"))
+	if filters.get("warehouse"):
+		adj_cond.append("warehouse = %s")
+		adj_val.append(filters.get("warehouse"))
+
+	adj_rows = frappe.db.sql(
+		f"""
+		SELECT item_code, SUM(actual_qty) as adj_qty
+		FROM `tabStock Ledger Entry`
+		WHERE {" AND ".join(adj_cond)}
+		GROUP BY item_code
+	""",
+		tuple(adj_val),
+		as_dict=True,
+	)
+	adj_map = {r.item_code: flt(r.adj_qty) for r in adj_rows}
+
+	# 6. Last Sale Date (for Age Days)
 	last_sale_cond = ["sii.item_code IN %s", "si.docstatus = 1"]
 	last_sale_val = [tuple(item_codes)]
 	if filters.get("company"):
@@ -358,7 +477,7 @@ def get_data(filters):
 	)
 	last_sale_map = {r.item_code: r.last_date for r in last_sale_dates}
 
-	# 6. Current Stock Balance
+	# 7. Current Stock Balance / Valuation Rate
 	bin_wh_cond = ""
 	bin_wh_val = [tuple(item_codes)]
 	if filters.get("warehouse"):
@@ -396,15 +515,18 @@ def get_data(filters):
 		if s_val == 0.0 and s_qty > 0:
 			s_val = flt(s_qty * val_rate, 2)
 
+		# Last month sales includes free quantities
 		lm_info = last_month_map.get(code, {"qty": 0.0, "free": 0.0, "amount": 0.0})
-		s_last = lm_info["qty"]
+		s_last = flt(lm_info["qty"]) + flt(lm_info.get("free", 0.0))
 		last_month_val = flt(lm_info.get("amount"), 2)
 		if last_month_val == 0.0 and s_last > 0:
 			last_month_val = flt(s_last * val_rate, 2)
 
-		# Closing stock from bins or formula
-		current_stock = bin_map.get(code, {}).get("qty", 0.0)
-		closing_qty = current_stock if current_stock else (op_qty + rec_qty - (s_qty + s_free))
+		# Stock Adjustments
+		adjmt = adj_map.get(code, 0.0)
+
+		# Closing quantity: Opening + Purchases (incl. free) - (Sales Billed + Sales Free) + Adjustments
+		closing_qty = op_qty + rec_qty - (s_qty + s_free) + adjmt
 		closing_value = flt(closing_qty * val_rate, 2)
 
 		# Aging calculation
@@ -418,33 +540,34 @@ def get_data(filters):
 			is_non_moving = 1
 
 		# Skip item if zero activity and zero stock
-		if op_qty == 0 and rec_qty == 0 and s_qty == 0 and s_last == 0 and closing_qty == 0:
+		if op_qty == 0 and rec_qty == 0 and s_qty == 0 and s_free == 0 and s_last == 0 and closing_qty == 0:
 			continue
 
-		purchase_val = flt(rec_qty * val_rate, 2)
+		# Purchase Value: from purchase invoices/receipts or rate * rec_qty
+		purchase_val = purchase_val_map.get(code)
+		if purchase_val is None or purchase_val == 0.0:
+			purchase_val = flt(rec_qty * val_rate, 2)
+		else:
+			purchase_val = flt(purchase_val, 2)
 
 		tot_purchase_val += purchase_val
 		tot_sales_val += s_val
 		tot_closing_val += closing_value
 		tot_last_month_sales += last_month_val
 
-
 		row = {
 			"item_code": code,
 			"item_name": it.item_name,
 			"stock_uom": it.stock_uom,
 			"opening_qty": op_qty,
-			"opening_free": 0.0,
 			"receipt_qty": rec_qty,
-			"receipt_free": 0.0,
 			"purchase_value": purchase_val,
 			"sales_last": s_last,
 			"sales_qty": s_qty,
 			"sales_free": s_free,
 			"sales_value": s_val,
-			"adjmt": 0.0,
+			"adjmt": adjmt,
 			"closing_qty": closing_qty,
-			"closing_free": 0.0,
 			"closing_value": closing_value,
 			"age_days": age_str,
 			"is_non_moving": is_non_moving,

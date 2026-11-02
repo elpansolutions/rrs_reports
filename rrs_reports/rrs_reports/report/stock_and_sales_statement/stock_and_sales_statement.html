@@ -153,31 +153,26 @@
             <tr>
                 <th style="width: 25px;">#</th>
                 <th style="width: 80px;">{%= __("Item Code") %}</th>
-                <th style="width: 150px; text-align: left; padding-left: 4px;">{%= __("Product Name") %}</th>
-                <th style="width: 40px;">{%= __("Packg") %}</th>
-                <th style="width: 48px;">{%= __("Open Qty") %}</th>
-                <th style="width: 45px;">{%= __("Open Free") %}</th>
-                <th style="width: 48px;">{%= __("Rec Qty") %}</th>
-                <th style="width: 45px;">{%= __("Rec Free") %}</th>
-                <th style="width: 65px;">{%= __("Purchase Value") %}</th>
-                <th style="width: 50px;">{%= __("Last Mo") %}</th>
-                <th style="width: 48px;">{%= __("Sales Qty") %}</th>
-                <th style="width: 45px;">{%= __("Sales Free") %}</th>
-                <th style="width: 65px;">{%= __("Sales Value") %}</th>
-                <th style="width: 40px;">{%= __("Adjmt") %}</th>
-                <th style="width: 52px;">{%= __("Closing Qty") %}</th>
-                <th style="width: 45px;">{%= __("Close Free") %}</th>
-                <th style="width: 68px;">{%= __("Closing Value") %}</th>
-                <th style="width: 45px;">{%= __("Age Days") %}</th>
+                <th style="width: 190px; text-align: left; padding-left: 4px;">{%= __("Product Name") %}</th>
+                <th style="width: 45px;">{%= __("Packg") %}</th>
+                <th style="width: 58px;">{%= __("Open Qty") %}</th>
+                <th style="width: 58px;">{%= __("Rec Qty") %}</th>
+                <th style="width: 75px;">{%= __("Purchase Value") %}</th>
+                <th style="width: 55px;">{%= __("Last Mo") %}</th>
+                <th style="width: 58px;">{%= __("Sales Qty") %}</th>
+                <th style="width: 52px;">{%= __("Sales Free") %}</th>
+                <th style="width: 75px;">{%= __("Sales Value") %}</th>
+                <th style="width: 45px;">{%= __("Adjmt") %}</th>
+                <th style="width: 60px;">{%= __("Closing Qty") %}</th>
+                <th style="width: 78px;">{%= __("Closing Value") %}</th>
+                <th style="width: 46px;">{%= __("Age Days") %}</th>
             </tr>
         </thead>
         <tbody>
             {% 
                 var item_index = 0;
                 var tot_open_qty = 0.0;
-                var tot_open_free = 0.0;
                 var tot_receipt_qty = 0.0;
-                var tot_receipt_free = 0.0;
                 var tot_purchase_val = 0.0;
                 var tot_sales_last = 0.0;
                 var tot_sales_qty = 0.0;
@@ -185,7 +180,6 @@
                 var tot_sales_val = 0.0;
                 var tot_adjmt = 0.0;
                 var tot_closing_qty = 0.0;
-                var tot_closing_free = 0.0;
                 var tot_closing_val = 0.0;
                 var tot_last_month_sales = 0.0;
 
@@ -193,9 +187,7 @@
                     var row = data[i];
                     item_index++;
                     tot_open_qty += (row.opening_qty || 0.0);
-                    tot_open_free += (row.opening_free || 0.0);
                     tot_receipt_qty += (row.receipt_qty || 0.0);
-                    tot_receipt_free += (row.receipt_free || 0.0);
                     tot_purchase_val += (row.purchase_value || 0.0);
                     tot_sales_last += (row.sales_last || 0.0);
                     tot_sales_qty += (row.sales_qty || 0.0);
@@ -203,7 +195,6 @@
                     tot_sales_val += (row.sales_value || 0.0);
                     tot_adjmt += (row.adjmt || 0.0);
                     tot_closing_qty += (row.closing_qty || 0.0);
-                    tot_closing_free += (row.closing_free || 0.0);
                     tot_closing_val += (row.closing_value || 0.0);
                     tot_last_month_sales += (row.last_month_val || 0.0);
             %}
@@ -213,9 +204,7 @@
                 <td class="text-left">{%= row.item_name || "" %}</td>
                 <td class="text-center">{%= row.stock_uom || "" %}</td>
                 <td class="text-right">{%= row.opening_qty ? format_number(row.opening_qty, null, 2) : "-" %}</td>
-                <td class="text-right">{%= row.opening_free ? format_number(row.opening_free, null, 2) : "-" %}</td>
                 <td class="text-right">{%= row.receipt_qty ? format_number(row.receipt_qty, null, 2) : "-" %}</td>
-                <td class="text-right">{%= row.receipt_free ? format_number(row.receipt_free, null, 2) : "-" %}</td>
                 <td class="text-right bold">{%= row.purchase_value != null ? format_currency(row.purchase_value, currency) : "-" %}</td>
                 <td class="text-right">{%= row.sales_last ? format_number(row.sales_last, null, 2) : "-" %}</td>
                 <td class="text-right">{%= row.sales_qty ? format_number(row.sales_qty, null, 2) : "-" %}</td>
@@ -223,7 +212,6 @@
                 <td class="text-right bold">{%= row.sales_value != null ? format_currency(row.sales_value, currency) : "-" %}</td>
                 <td class="text-right">{%= row.adjmt ? format_number(row.adjmt, null, 2) : "-" %}</td>
                 <td class="text-right bold">{%= row.closing_qty ? format_number(row.closing_qty, null, 2) : "-" %}</td>
-                <td class="text-right">{%= row.closing_free ? format_number(row.closing_free, null, 2) : "-" %}</td>
                 <td class="text-right bold">{%= row.closing_value != null ? format_currency(row.closing_value, currency) : "-" %}</td>
                 <td class="text-center {%= row.is_non_moving ? 'bold' : '' %}">{%= row.age_days || "-" %}</td>
             </tr>
@@ -233,9 +221,7 @@
             <tr style="font-weight: bold; background: #f8fafc; border-top: 1.5px solid #000;">
                 <td colspan="4" class="text-right bold">{%= __("Total") %}</td>
                 <td class="text-right bold">{%= tot_open_qty ? format_number(tot_open_qty, null, 2) : "-" %}</td>
-                <td class="text-right bold">{%= tot_open_free ? format_number(tot_open_free, null, 2) : "-" %}</td>
                 <td class="text-right bold">{%= tot_receipt_qty ? format_number(tot_receipt_qty, null, 2) : "-" %}</td>
-                <td class="text-right bold">{%= tot_receipt_free ? format_number(tot_receipt_free, null, 2) : "-" %}</td>
                 <td class="text-right bold">{%= format_currency(tot_purchase_val, currency) %}</td>
                 <td class="text-right bold">{%= tot_sales_last ? format_number(tot_sales_last, null, 2) : "-" %}</td>
                 <td class="text-right bold">{%= tot_sales_qty ? format_number(tot_sales_qty, null, 2) : "-" %}</td>
@@ -243,7 +229,6 @@
                 <td class="text-right bold">{%= format_currency(tot_sales_val, currency) %}</td>
                 <td class="text-right bold">{%= tot_adjmt ? format_number(tot_adjmt, null, 2) : "-" %}</td>
                 <td class="text-right bold">{%= tot_closing_qty ? format_number(tot_closing_qty, null, 2) : "-" %}</td>
-                <td class="text-right bold">{%= tot_closing_free ? format_number(tot_closing_free, null, 2) : "-" %}</td>
                 <td class="text-right bold">{%= format_currency(tot_closing_val, currency) %}</td>
                 <td></td>
             </tr>
