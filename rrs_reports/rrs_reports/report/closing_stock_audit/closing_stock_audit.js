@@ -46,6 +46,21 @@ frappe.query_reports["Closing Stock Audit"] = {
 		}
 	],
 	formatter: function (value, row, column, data, default_formatter) {
+		// Total row handling
+		if (
+			(row && (row.is_total_row || row.isTotalRow || row.rowIndex === "totalRow")) ||
+			(data && (data.is_total_row || data.isTotalRow))
+		) {
+			if (column.fieldname === "item_code") {
+				return `<span style="font-weight: bold;">${__("Total")}</span>`;
+			}
+			if (column.fieldname === "avg_purchase_price") {
+				return "";
+			}
+			let formatted = default_formatter(value, row, column, data);
+			return `<span style="font-weight: bold;">${formatted}</span>`;
+		}
+
 		if (data && data.is_brand_header) {
 			if (column.fieldname === "item_code") {
 				return `<span style="font-weight: bold; color: #047857; font-size: 13px;">${value}</span>`;

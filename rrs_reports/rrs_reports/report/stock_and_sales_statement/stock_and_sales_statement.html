@@ -170,6 +170,7 @@
         </thead>
         <tbody>
             {% 
+                var currency = frappe.defaults.get_default("currency") || (frappe.boot && frappe.boot.sysdefaults && frappe.boot.sysdefaults.currency) || "₹";
                 var item_index = 0;
                 var tot_open_qty = 0.0;
                 var tot_receipt_qty = 0.0;
