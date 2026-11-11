@@ -47,7 +47,8 @@ def run_tests():
     report_summary = res[4] if len(res) > 4 else None
 
     print(f"Columns count: {len(cols2)}, Total rows (invoices + items): {len(data2)}")
-    assert len(cols2) == 34, f"Expected 34 columns in drilldown mode, got {len(cols2)}"
+    assert len(cols2) == 35, f"Expected 35 columns in drilldown mode, got {len(cols2)}"
+    assert "brand" in [c["fieldname"] for c in cols2], "Expected 'brand' in drilldown columns"
     assert len(data2) > len(data1), f"Expected more rows with items ({len(data2)}) than parent invoices ({len(data1)})"
     
     parent_rows = [r for r in data2 if r.get("indent") == 0]
@@ -56,10 +57,11 @@ def run_tests():
     assert len(parent_rows) == len(data1), "Number of parent invoices should match standard mode count"
     assert len(child_rows) > 0, "Child item rows should be present"
 
-    # Verify purchase price, margin calculation, and HSN code on child rows
+    # Verify purchase price, margin calculation, brand, and HSN code on child rows
     print("\nSample Item Rows with Details & HSN:")
     for child in child_rows[:5]:
-        print(f"  Item: {child.get('item_code')} | HSN: {child.get('gst_hsn_code')} | Qty: {child.get('qty')} | Selling: {child.get('selling_rate')} | Purchase: {child.get('purchase_rate')} | Cost: {child.get('purchase_amount')} | Profit: {child.get('profit')} ({child.get('profit_percent')}%)")
+        print(f"  Item: {child.get('item_code')} | Brand: {child.get('brand')} | HSN: {child.get('gst_hsn_code')} | Qty: {child.get('qty')} | Selling: {child.get('selling_rate')} | Purchase: {child.get('purchase_rate')} | Cost: {child.get('purchase_amount')} | Profit: {child.get('profit')} ({child.get('profit_percent')}%)")
+        assert "brand" in child
         assert "purchase_rate" in child
         assert "purchase_amount" in child
         assert "profit" in child
@@ -132,6 +134,43 @@ def run_tests():
         assert return_parent.get("total") < 0, "Return invoice total should be negative"
         assert return_parent.get("purchase_amount") < 0, "Return invoice purchase amount should be negative (reversal)"
         print("PASS: Return / Credit note correctly reversed purchase cost and profit.")
+
+    print("\n--- Test 8: Filter by Brand ---")
+    # Temporarily assign brand to item 003 to test brand matching
+    frappe.db.set_value("Item", "003", "brand", "MERIL JOINTS")
+    try:
+        res_brand_list = execute({
+            "company": company,
+            "from_date": "2026-01-01",
+            "to_date": "2026-12-31",
+            "show_item_details": 1,
+            "brand": ["MERIL JOINTS"]
+        })
+        data_brand_list = res_brand_list[1]
+        print(f"Rows matching brand list ['MERIL JOINTS']: {len(data_brand_list)}")
+        assert len(data_brand_list) > 0, "Expected matches for brand list ['MERIL JOINTS']"
+
+        res_brand_str = execute({
+            "company": company,
+            "from_date": "2026-01-01",
+            "to_date": "2026-12-31",
+            "show_item_details": 0,
+            "brand": "MERIL JOINTS"
+        })
+        data_brand_str = res_brand_str[1]
+        print(f"Summary invoices matching brand 'MERIL JOINTS': {len(data_brand_str)}")
+        assert len(data_brand_str) > 0, "Expected summary invoice matches for brand string"
+
+        res_brand_none = execute({
+            "company": company,
+            "from_date": "2026-01-01",
+            "to_date": "2026-12-31",
+            "brand": "NON_EXISTENT_BRAND_XYZ"
+        })
+        assert len(res_brand_none[1]) == 0, "Expected 0 matches for non-existent brand"
+        print("PASS: Filter by Brand works in both standard and drilldown modes.")
+    finally:
+        frappe.db.set_value("Item", "003", "brand", None)
 
     print("\nALL INVOICE-WISE SALES ABSTRACT ENHANCED TESTS PASSED!")
 

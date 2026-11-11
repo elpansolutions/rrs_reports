@@ -250,6 +250,13 @@ def get_columns(filters=None):
 			"width": 180,
 		},
 		{
+			"label": _("Brand"),
+			"fieldname": "brand",
+			"fieldtype": "Link",
+			"options": "Brand",
+			"width": 110,
+		},
+		{
 			"label": _("HSN/SAC"),
 			"fieldname": "gst_hsn_code",
 			"fieldtype": "Data",
@@ -761,10 +768,11 @@ def get_data(filters):
 		conditions.append("si.custom_patient_name LIKE %(patient_name)s")
 		values["patient_name"] = f"%{filters.get('patient_name')}%"
 
-	# If item filter or item group filter is applied, pre-filter invoices
+	# If item filter, item group filter, or brand filter is applied, pre-filter invoices
 	item_filter = filters.get("item_code")
 	item_group_filter = filters.get("item_group")
-	if item_filter or item_group_filter:
+	brand_list = get_filter_list(filters.get("brand"))
+	if item_filter or item_group_filter or brand_list:
 		item_conds = []
 		if item_filter:
 			item_conds.append("sii.item_code = %(item_code)s")
@@ -772,11 +780,15 @@ def get_data(filters):
 		if item_group_filter:
 			item_conds.append("sii.item_group = %(item_group)s")
 			values["item_group"] = item_group_filter
+		if brand_list:
+			item_conds.append("(sii.brand IN %(brand_list)s OR it_m.brand IN %(brand_list)s)")
+			values["brand_list"] = tuple(brand_list)
 
 		matching_invoices = frappe.db.sql(
 			f"""
 			SELECT DISTINCT sii.parent
 			FROM `tabSales Invoice Item` sii
+			LEFT JOIN `tabItem` it_m ON it_m.name = sii.item_code
 			WHERE {" AND ".join(item_conds)}
 		""",
 			values,
@@ -896,38 +908,40 @@ def get_data(filters):
 	items = frappe.db.sql(
 		"""
 		SELECT
-			name,
-			parent,
-			item_code,
-			item_name,
-			description,
-			gst_hsn_code,
-			qty,
-			stock_qty,
-			uom,
-			stock_uom,
-			conversion_factor,
-			rate,
-			net_rate,
-			amount,
-			net_amount,
-			taxable_value,
-			incoming_rate,
-			serial_and_batch_bundle,
-			delivery_note,
-			dn_detail,
-			batch_no,
-			custom_batch_id_all,
-			warehouse,
-			cgst_rate,
-			sgst_rate,
-			igst_rate,
-			cgst_amount,
-			sgst_amount,
-			igst_amount
-		FROM `tabSales Invoice Item`
-		WHERE parent IN %s
-		ORDER BY parent, idx
+			sii.name,
+			sii.parent,
+			sii.item_code,
+			sii.item_name,
+			sii.description,
+			sii.gst_hsn_code,
+			sii.qty,
+			sii.stock_qty,
+			sii.uom,
+			sii.stock_uom,
+			sii.conversion_factor,
+			sii.rate,
+			sii.net_rate,
+			sii.amount,
+			sii.net_amount,
+			sii.taxable_value,
+			sii.incoming_rate,
+			sii.serial_and_batch_bundle,
+			sii.delivery_note,
+			sii.dn_detail,
+			sii.batch_no,
+			sii.custom_batch_id_all,
+			sii.warehouse,
+			sii.cgst_rate,
+			sii.sgst_rate,
+			sii.igst_rate,
+			sii.cgst_amount,
+			sii.sgst_amount,
+			sii.igst_amount,
+			COALESCE(NULLIF(sii.brand, ''), it_m.brand, '') as brand
+		FROM `tabSales Invoice Item` sii
+		LEFT JOIN `tabItem` it_m ON it_m.name = sii.item_code
+		WHERE sii.parent IN %s
+		ORDER BY sii.parent, sii.idx
 	""",
 		(tuple(inv_names),),
 		as_dict=True,
@@ -1023,6 +1037,7 @@ def get_data(filters):
 					"sales_person": "",
 					"item_code": it.item_code,
 					"item_name": it.item_name or it.description,
+					"brand": it.brand or "",
 					"gst_hsn_code": it.gst_hsn_code or "",
 					"batch_no": it.batch_no or it.custom_batch_id_all or "",
 					"place": "",
@@ -1089,6 +1104,7 @@ def get_data(filters):
 				"sales_person": sp_display,
 				"item_code": "",
 				"item_name": f"{len(inv_items)} Item(s)",
+				"brand": "",
 				"gst_hsn_code": "",
 				"batch_no": "",
 				"place": place,

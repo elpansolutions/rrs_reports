@@ -164,6 +164,14 @@ frappe.query_reports["Invoice-Wise Sales Abstract"] = {
 			}
 		},
 		{
+			fieldname: "brand",
+			label: __("Brand"),
+			fieldtype: "MultiSelectList",
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Brand", txt);
+			}
+		},
+		{
 			fieldname: "sales_person",
 			label: __("Sales Person / Rep"),
 			fieldtype: "Link",
