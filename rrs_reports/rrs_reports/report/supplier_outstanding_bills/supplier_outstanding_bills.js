@@ -46,10 +46,21 @@ frappe.query_reports["Supplier Outstanding Bills"] = {
 		}
 	],
 	formatter: function (value, row, column, data, default_formatter) {
-		value = default_formatter(value, row, column, data);
 		if (data && data.is_supplier_header) {
-			value = `<span style="font-weight: bold; color: #7c2d12; font-size: 13px;">${value}</span>`;
-		} else if (data && data.is_grand_total) {
+			if (
+				column.fieldname === "supplier_details" ||
+				column.fieldname === "party_details" ||
+				column.fieldname === "supplier_group" ||
+				column.fieldname === "group_or_territory"
+			) {
+				let text = data[column.fieldname] || value || "";
+				return `<span style="font-weight: bold; color: #7c2d12; font-size: 13px;">${text}</span>`;
+			}
+			return "";
+		}
+
+		value = default_formatter(value, row, column, data);
+		if (data && data.is_grand_total) {
 			let color = (data.outstanding_amount < 0) ? "#059669" : "#111827";
 			value = `<span style="font-weight: 800; color: ${color}; font-size: 13px; text-transform: uppercase;">${value}</span>`;
 		} else if (data && data.is_subtotal) {

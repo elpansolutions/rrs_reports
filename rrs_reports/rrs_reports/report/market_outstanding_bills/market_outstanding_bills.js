@@ -96,11 +96,26 @@ frappe.query_reports["Market Outstanding Bills"] = {
 		report.toggle_filter_display("supplier_group", is_customer);
 	},
 	formatter: function (value, row, column, data, default_formatter) {
-		value = default_formatter(value, row, column, data);
 		if (data && (data.is_customer_header || data.is_party_header || data.is_supplier_header)) {
-			let header_color = (frappe.query_report.get_filter_value("party_type") === "Supplier") ? "#7c2d12" : "#1e3a8a";
-			value = `<span style="font-weight: bold; color: ${header_color}; font-size: 13px;">${value}</span>`;
-		} else if (data && data.is_grand_total) {
+			let party_type = frappe.query_report.get_filter_value("party_type") || "Customer";
+			let header_color = (party_type === "Supplier" || data.is_supplier_header) ? "#7c2d12" : "#1e3a8a";
+
+			if (
+				column.fieldname === "party_details" ||
+				column.fieldname === "customer_details" ||
+				column.fieldname === "supplier_details" ||
+				column.fieldname === "group_or_territory" ||
+				column.fieldname === "territory" ||
+				column.fieldname === "supplier_group"
+			) {
+				let text = data[column.fieldname] || value || "";
+				return `<span style="font-weight: bold; color: ${header_color}; font-size: 13px;">${text}</span>`;
+			}
+			return "";
+		}
+
+		value = default_formatter(value, row, column, data);
+		if (data && data.is_grand_total) {
 			let color = (data.outstanding_amount < 0) ? "#059669" : "#111827";
 			value = `<span style="font-weight: 800; color: ${color}; font-size: 13px; text-transform: uppercase;">${value}</span>`;
 		} else if (data && data.is_subtotal) {

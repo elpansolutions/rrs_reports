@@ -279,6 +279,8 @@ def get_data(filters):
 		data.append({
 			"supplier_details": supp_header_str,
 			"supplier_group": grp,
+			"invoiced_amount": None,
+			"outstanding_amount": None,
 			"is_supplier_header": 1,
 		})
 

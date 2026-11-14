@@ -337,6 +337,8 @@ def get_customer_data(filters):
 			"customer_details": cust_header_str,
 			"group_or_territory": terr,
 			"territory": terr,
+			"invoiced_amount": None,
+			"outstanding_amount": None,
 			"is_customer_header": 1,
 			"is_party_header": 1,
 		})
@@ -613,6 +615,8 @@ def get_supplier_data(filters):
 			"customer_details": supp_header_str,
 			"group_or_territory": grp,
 			"territory": grp,
+			"invoiced_amount": None,
+			"outstanding_amount": None,
 			"is_supplier_header": 1,
 			"is_party_header": 1,
 		})
