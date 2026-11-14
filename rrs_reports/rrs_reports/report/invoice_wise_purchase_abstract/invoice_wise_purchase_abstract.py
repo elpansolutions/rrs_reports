@@ -19,7 +19,7 @@ def execute(filters=None):
 def get_columns():
 	return [
 		{
-			"label": _("Date"),
+			"label": _("Posting Date"),
 			"fieldname": "posting_date",
 			"fieldtype": "Date",
 			"width": 95,
@@ -29,6 +29,12 @@ def get_columns():
 			"fieldname": "bill_no",
 			"fieldtype": "Data",
 			"width": 120,
+		},
+		{
+			"label": _("Bill Date"),
+			"fieldname": "bill_date",
+			"fieldtype": "Date",
+			"width": 95,
 		},
 		{
 			"label": _("Inv. No"),
@@ -146,13 +152,29 @@ def get_data(filters):
 		conditions.append("pi.company = %(company)s")
 		values["company"] = filters.get("company")
 
+	date_based_on = filters.get("date_based_on") or "Posting Date"
+	is_bill_date = date_based_on == "Supplier Invoice Date"
+	date_field = "pi.bill_date" if is_bill_date else "pi.posting_date"
+
 	if filters.get("from_date"):
-		conditions.append("pi.posting_date >= %(from_date)s")
+		conditions.append(f"{date_field} >= %(from_date)s")
 		values["from_date"] = filters.get("from_date")
 
 	if filters.get("to_date"):
-		conditions.append("pi.posting_date <= %(to_date)s")
+		conditions.append(f"{date_field} <= %(to_date)s")
 		values["to_date"] = filters.get("to_date")
+
+	if filters.get("from_bill_date"):
+		conditions.append("pi.bill_date >= %(from_bill_date)s")
+		values["from_bill_date"] = filters.get("from_bill_date")
+
+	if filters.get("to_bill_date"):
+		conditions.append("pi.bill_date <= %(to_bill_date)s")
+		values["to_bill_date"] = filters.get("to_bill_date")
+
+	if filters.get("bill_date"):
+		conditions.append("pi.bill_date = %(bill_date)s")
+		values["bill_date"] = filters.get("bill_date")
 
 	supplier_list = get_filter_list(filters.get("supplier"))
 	if supplier_list:
@@ -164,12 +186,18 @@ def get_data(filters):
 		values["supplier_group"] = filters.get("supplier_group")
 
 	where_clause = " AND ".join(conditions)
+	order_by = (
+		"pi.bill_date ASC, pi.posting_date ASC, pi.name ASC"
+		if is_bill_date
+		else "pi.posting_date ASC, pi.name ASC"
+	)
 
 	invoices = frappe.db.sql(
 		f"""
 		SELECT
 			pi.name,
 			pi.bill_no,
+			pi.bill_date,
 			pi.posting_date,
 			pi.supplier,
 			pi.supplier_name,
@@ -179,7 +207,7 @@ def get_data(filters):
 			pi.base_grand_total
 		FROM `tabPurchase Invoice` pi
 		WHERE {where_clause}
-		ORDER BY pi.posting_date ASC, pi.name ASC
+		ORDER BY {order_by}
 	""",
 		values,
 		as_dict=True,
@@ -283,6 +311,7 @@ def get_data(filters):
 		row = {
 			"posting_date": inv.posting_date,
 			"bill_no": inv.bill_no or "-",
+			"bill_date": inv.bill_date,
 			"voucher_no": inv.name,
 			"supplier_name": inv.supplier_name,
 			"place": place,
