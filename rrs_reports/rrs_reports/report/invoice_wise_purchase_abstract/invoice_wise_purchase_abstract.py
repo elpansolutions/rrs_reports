@@ -56,70 +56,46 @@ def get_columns():
 			"width": 140,
 		},
 		{
-			"label": _("5% Purchase"),
-			"fieldname": "purchase_5",
+			"label": _("Taxable Amount"),
+			"fieldname": "taxable_amount",
 			"fieldtype": "Currency",
-			"width": 110,
+			"width": 125,
 		},
 		{
-			"label": _("5% GST"),
-			"fieldname": "gst_5",
+			"label": _("CGST Amount"),
+			"fieldname": "cgst_amount",
 			"fieldtype": "Currency",
-			"width": 100,
+			"width": 115,
 		},
 		{
-			"label": _("12% Purchase"),
-			"fieldname": "purchase_12",
+			"label": _("SGST Amount"),
+			"fieldname": "sgst_amount",
 			"fieldtype": "Currency",
-			"width": 110,
+			"width": 115,
 		},
 		{
-			"label": _("12% GST"),
-			"fieldname": "gst_12",
+			"label": _("IGST Amount"),
+			"fieldname": "igst_amount",
 			"fieldtype": "Currency",
-			"width": 100,
-		},
-		{
-			"label": _("18% Purchase"),
-			"fieldname": "purchase_18",
-			"fieldtype": "Currency",
-			"width": 110,
-		},
-		{
-			"label": _("18% GST"),
-			"fieldname": "gst_18",
-			"fieldtype": "Currency",
-			"width": 100,
-		},
-		{
-			"label": _("28% Purchase"),
-			"fieldname": "purchase_28",
-			"fieldtype": "Currency",
-			"width": 110,
-		},
-		{
-			"label": _("28% GST"),
-			"fieldname": "gst_28",
-			"fieldtype": "Currency",
-			"width": 100,
+			"width": 115,
 		},
 		{
 			"label": _("Exempted"),
 			"fieldname": "exempted",
 			"fieldtype": "Currency",
-			"width": 105,
+			"width": 110,
 		},
 		{
 			"label": _("Misc"),
 			"fieldname": "misc",
 			"fieldtype": "Currency",
-			"width": 90,
+			"width": 95,
 		},
 		{
-			"label": _("Total"),
+			"label": _("Total Amount"),
 			"fieldname": "total",
 			"fieldtype": "Currency",
-			"width": 125,
+			"width": 130,
 		},
 	]
 
@@ -261,41 +237,65 @@ def get_data(filters):
 	for it in items:
 		items_by_invoice.setdefault(it.parent, []).append(it)
 
+	# Pre-fetch taxes from tabPurchase Taxes and Charges as fallback
+	taxes = frappe.db.sql(
+		"""
+		SELECT
+			parent,
+			account_head,
+			tax_amount
+		FROM `tabPurchase Taxes and Charges`
+		WHERE parent IN %s
+	""",
+		(tuple(inv_names),),
+		as_dict=True,
+	)
+	taxes_by_invoice = {}
+	for t in taxes:
+		taxes_by_invoice.setdefault(t.parent, []).append(t)
+
 	data = []
 
 	for inv in invoices:
 		inv_items = items_by_invoice.get(inv.name, [])
+		inv_taxes = taxes_by_invoice.get(inv.name, [])
 
-		p_5 = 0.0
-		g_5 = 0.0
-		p_12 = 0.0
-		g_12 = 0.0
-		p_18 = 0.0
-		g_18 = 0.0
-		p_28 = 0.0
-		g_28 = 0.0
+		taxable_amt = 0.0
+		cgst_amt = 0.0
+		sgst_amt = 0.0
+		igst_amt = 0.0
 		exempt = 0.0
 
 		for it in inv_items:
 			taxable = flt(it.taxable_value) if flt(it.taxable_value) else flt(it.net_amount)
 			rate = flt(it.igst_rate) if flt(it.igst_rate) > 0 else (flt(it.cgst_rate) + flt(it.sgst_rate))
-			tax_amt = flt(it.igst_amount) + flt(it.cgst_amount) + flt(it.sgst_amount)
+			c = flt(it.cgst_amount)
+			s = flt(it.sgst_amount)
+			i = flt(it.igst_amount)
 
-			r = round(rate)
-			if r == 5:
-				p_5 += taxable
-				g_5 += tax_amt
-			elif r == 12:
-				p_12 += taxable
-				g_12 += tax_amt
-			elif r == 18:
-				p_18 += taxable
-				g_18 += tax_amt
-			elif r == 28:
-				p_28 += taxable
-				g_28 += tax_amt
+			if rate > 0 or c > 0 or s > 0 or i > 0:
+				taxable_amt += taxable
+				cgst_amt += c
+				sgst_amt += s
+				igst_amt += i
 			else:
 				exempt += taxable
+
+		# Fallback to Purchase Taxes and Charges if item-level taxes were not populated
+		if (cgst_amt + sgst_amt + igst_amt) == 0 and inv_taxes:
+			for t in inv_taxes:
+				acct = (t.account_head or "").upper()
+				amt = flt(t.tax_amount)
+				if "CGST" in acct:
+					cgst_amt += amt
+				elif "SGST" in acct or "UTGST" in acct:
+					sgst_amt += amt
+				elif "IGST" in acct:
+					igst_amt += amt
+
+			if (cgst_amt + sgst_amt + igst_amt) > 0 and taxable_amt == 0 and exempt > 0:
+				taxable_amt = exempt
+				exempt = 0.0
 
 		# Determine place
 		place = ""
@@ -304,9 +304,11 @@ def get_data(filters):
 		elif inv.supplier_group:
 			place = inv.supplier_group
 
-		line_taxable_and_gst = p_5 + g_5 + p_12 + g_12 + p_18 + g_18 + p_28 + g_28 + exempt
+		line_taxable_and_gst = taxable_amt + cgst_amt + sgst_amt + igst_amt + exempt
 		total_val = flt(inv.grand_total, 2)
 		misc = flt(total_val - line_taxable_and_gst, 2)
+		if abs(misc) < 0.005:
+			misc = 0.0
 
 		row = {
 			"posting_date": inv.posting_date,
@@ -315,15 +317,11 @@ def get_data(filters):
 			"voucher_no": inv.name,
 			"supplier_name": inv.supplier_name,
 			"place": place,
-			"purchase_5": flt(p_5, 2) if p_5 else 0.0,
-			"gst_5": flt(g_5, 2) if g_5 else 0.0,
-			"purchase_12": flt(p_12, 2) if p_12 else 0.0,
-			"gst_12": flt(g_12, 2) if g_12 else 0.0,
-			"purchase_18": flt(p_18, 2) if p_18 else 0.0,
-			"gst_18": flt(g_18, 2) if g_18 else 0.0,
-			"purchase_28": flt(p_28, 2) if p_28 else 0.0,
-			"gst_28": flt(g_28, 2) if g_28 else 0.0,
-			"exempted": flt(exempt, 2) if exempt else 0.0,
+			"taxable_amount": flt(taxable_amt, 2),
+			"cgst_amount": flt(cgst_amt, 2),
+			"sgst_amount": flt(sgst_amt, 2),
+			"igst_amount": flt(igst_amt, 2),
+			"exempted": flt(exempt, 2),
 			"misc": misc,
 			"total": total_val,
 		}
