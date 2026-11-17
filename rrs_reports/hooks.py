@@ -7,6 +7,8 @@ app_license = "mit"
 
 app_home = "/app/rrs-reports"
 
+app_include_js = "/assets/rrs_reports/js/rrs_reports.js"
+
 add_to_apps_screen = [
 	{
 		"name": "rrs_reports",

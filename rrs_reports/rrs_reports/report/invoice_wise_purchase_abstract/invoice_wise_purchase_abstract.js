@@ -54,7 +54,20 @@ frappe.query_reports["Invoice-Wise Purchase Abstract"] = {
 			label: __("Supplier"),
 			fieldtype: "MultiSelectList",
 			get_data: function (txt) {
-				return frappe.db.get_link_options("Supplier", txt);
+				return new Promise(function (resolve) {
+					frappe.call({
+						type: "GET",
+						method: "frappe.desk.search.search_link",
+						args: {
+							doctype: "Supplier",
+							txt: txt || "",
+							page_length: 0
+						},
+						callback: function (r) {
+							resolve(r.message || []);
+						}
+					});
+				});
 			}
 		},
 		{
@@ -65,6 +78,13 @@ frappe.query_reports["Invoice-Wise Purchase Abstract"] = {
 		}
 	],
 	onload: function (report) {
+		if (window.rrs_enhance_multiselect && report && report.filters) {
+			report.filters.forEach(function (f) {
+				if (f.df && f.df.fieldtype === "MultiSelectList") {
+					window.rrs_enhance_multiselect(f);
+				}
+			});
+		}
 		let based_on = report.get_filter_value("date_based_on");
 		let from_filter = report.get_filter("from_date");
 		let to_filter = report.get_filter("to_date");
