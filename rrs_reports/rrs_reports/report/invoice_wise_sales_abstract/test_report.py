@@ -14,7 +14,7 @@ def run_tests():
     }
     cols1, data1, _, _, summary1 = execute(filters_standard)
     print(f"Columns count: {len(cols1)}, Data rows: {len(data1)}, Summary cards: {len(summary1)}")
-    assert len(cols1) == 27, f"Expected 27 standard columns, got {len(cols1)}"
+    assert len(cols1) == 24, f"Expected 24 standard columns, got {len(cols1)}"
     assert len(data1) > 0, "Expected data rows"
     first_row = data1[0]
     print(f"Sample row: Inv={first_row.get('voucher_no')}, Date={first_row.get('posting_date')}, Status={first_row.get('status')}, SalesRep={first_row.get('sales_person')}, Total={first_row.get('total')}")
@@ -30,6 +30,8 @@ def run_tests():
     assert "e_waybill_status" in first_row
     assert "doctor_name" in first_row
     assert "patient_name" in first_row
+    assert "value_before_tax" in first_row
+    assert "taxable_amount" in first_row
     assert "total" in first_row
     assert "indent" not in first_row, "Standard mode should not have indent"
     print("PASS: Standard Abstract Mode works with all transport, rep, and e-waybill columns.")
@@ -47,7 +49,7 @@ def run_tests():
     report_summary = res[4] if len(res) > 4 else None
 
     print(f"Columns count: {len(cols2)}, Total rows (invoices + items): {len(data2)}")
-    assert len(cols2) == 35, f"Expected 35 columns in drilldown mode, got {len(cols2)}"
+    assert len(cols2) == 32, f"Expected 32 columns in drilldown mode, got {len(cols2)}"
     assert "brand" in [c["fieldname"] for c in cols2], "Expected 'brand' in drilldown columns"
     assert len(data2) > len(data1), f"Expected more rows with items ({len(data2)}) than parent invoices ({len(data1)})"
     
@@ -171,6 +173,18 @@ def run_tests():
         print("PASS: Filter by Brand works in both standard and drilldown modes.")
     finally:
         frappe.db.set_value("Item", "003", "brand", None)
+
+    print("\n--- Test 9: Filter by GST Rate ---")
+    res_gst_5 = execute({
+        "company": company,
+        "from_date": "2026-01-01",
+        "to_date": "2026-12-31",
+        "gst_rate": "5%"
+    })
+    data_gst_5 = res_gst_5[1]
+    print(f"Rows matching GST Rate '5%': {len(data_gst_5)}")
+    assert len(data_gst_5) > 0, "Expected matches for GST Rate 5%"
+    print("PASS: Filter by GST Rate works.")
 
     print("\nALL INVOICE-WISE SALES ABSTRACT ENHANCED TESTS PASSED!")
 

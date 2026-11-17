@@ -472,6 +472,12 @@ frappe.query_reports["Invoice-Wise Sales Abstract"] = {
 			fieldtype: "Link",
 			options: "Item Group",
 			depends_on: "eval: doc.show_item_details"
+		},
+		{
+			fieldname: "gst_rate",
+			label: __("GST Rate"),
+			fieldtype: "Select",
+			options: "\n0%\n5%\n12%\n18%\n28%"
 		}
 	],
 	initial_depth: 0,
