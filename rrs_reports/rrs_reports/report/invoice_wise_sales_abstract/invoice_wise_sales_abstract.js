@@ -521,6 +521,64 @@ frappe.query_reports["Invoice-Wise Sales Abstract"] = {
 			};
 		}
 	},
+	get_datatable_options: function (options) {
+		options = options || {};
+		// Ensure total row is shown even in tree view mode
+		options.showTotalRow = true;
+
+		options.hooks = options.hooks || {};
+		options.hooks.columnTotal = function (columnValues, cell) {
+			let col = cell.column && cell.column.column ? cell.column.column : (cell.column || {});
+			if (col.disable_total) {
+				return "";
+			}
+
+			let fieldtype = col.fieldtype;
+			if (!frappe.model.is_numeric_field(fieldtype)) {
+				return null;
+			}
+
+			// Don't show sum for per-unit price / rate columns
+			if (col.fieldname === "selling_rate" || col.fieldname === "purchase_rate") {
+				return "";
+			}
+
+			let colIndex = cell.colIndex;
+			let rows = (this.bodyRenderer && this.bodyRenderer.visibleRows) || [];
+
+			// If any row has tree indentation, filter to only root/invoice rows (indent === 0)
+			let hasTreeRows = rows.some(function (r) {
+				return r && r.meta && typeof r.meta.indent !== "undefined";
+			});
+
+			let total = 0.0;
+			let count = 0;
+
+			rows.forEach(function (row) {
+				if (!row) return;
+				let indent = (row.meta && typeof row.meta.indent !== "undefined") ? row.meta.indent : 0;
+				// Only aggregate parent/invoice rows when tree indentation is present
+				if (!hasTreeRows || indent === 0) {
+					let val = row[colIndex] ? row[colIndex].content : 0;
+					if (val != null && val !== "") {
+						if (fieldtype === "Int") {
+							total += cint(val);
+						} else {
+							total += flt(val);
+						}
+						count++;
+					}
+				}
+			});
+
+			if (fieldtype === "Percent") {
+				return count > 0 ? (total / count) : 0;
+			}
+			return total;
+		};
+
+		return options;
+	},
 	after_datatable_render: function (datatable) {
 		let report = frappe.query_report;
 		if (!report || !report.$report) return;

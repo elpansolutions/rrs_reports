@@ -13,9 +13,11 @@ def execute(filters=None):
 	columns = get_columns(filters)
 	data, report_summary = get_data(filters)
 
-	if report_summary:
-		return columns, data, None, None, report_summary
-	return columns, data
+	# If item details are shown, child rows are present (indent=1).
+	# Pass skip_total_row = 1 so backend does not sum parent + child rows.
+	skip_total_row = 1 if filters.get("show_item_details") else 0
+
+	return columns, data, None, None, report_summary, skip_total_row
 
 
 def get_columns(filters=None):

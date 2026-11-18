@@ -12,7 +12,9 @@ def run_tests():
         "to_date": "2026-12-31",
         "show_item_details": 0
     }
-    cols1, data1, _, _, summary1 = execute(filters_standard)
+    res1 = execute(filters_standard)
+    cols1, data1 = res1[0], res1[1]
+    summary1 = res1[4] if len(res1) > 4 else None
     print(f"Columns count: {len(cols1)}, Data rows: {len(data1)}, Summary cards: {len(summary1)}")
     assert len(cols1) == 24, f"Expected 24 standard columns, got {len(cols1)}"
     assert len(data1) > 0, "Expected data rows"
