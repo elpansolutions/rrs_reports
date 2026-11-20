@@ -18,9 +18,9 @@
 	function is_match(opt, query) {
 		if (!query) return true;
 		let q = query.toLowerCase();
-		let l = (opt.label || "").toLowerCase();
-		let v = (opt.value || "").toLowerCase();
-		let d = (opt.description || "").toLowerCase();
+		let l = String(opt.label != null ? opt.label : "").toLowerCase();
+		let v = String(opt.value != null ? opt.value : "").toLowerCase();
+		let d = String(opt.description != null ? opt.description : "").toLowerCase();
 		return l.includes(q) || v.includes(q) || d.includes(q);
 	}
 
